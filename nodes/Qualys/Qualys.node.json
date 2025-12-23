@@ -1,0 +1,16 @@
+{
+	"node": "n8n-nodes-base.qualys",
+	"nodeVersion": "0.1",
+	"codexVersion": "0.1",
+	"categories": [
+		"Qualys",
+		"Security"
+	],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "http://httpbin.org/#/Auth/get_bearer"
+			}
+		]
+	}
+}
