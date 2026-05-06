@@ -1,6 +1,6 @@
 {
-  "name": "n8n-qualys-nodes",
-  "version": "0.1.0",
+  "name": "@syn-con/n8n-qualys-nodes",
+  "version": "1.0.0",
   "description": "",
   "keywords": [
     "n8n-community-node-package"
