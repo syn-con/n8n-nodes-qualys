@@ -51,36 +51,40 @@ const resourceDefinitions: Record<QualysVmdrOtResource, ResourceDefinition> = {
 };
 
 export async function router(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-  const inputItems = this.getInputData();
   const returnData: INodeExecutionData[] = [];
 
-  for (let itemIndex = 0; itemIndex < inputItems.length; itemIndex++) {
-    try {
-      const operation = this.getNodeParameter('operation', itemIndex) as QualysVmdrOtOperation;
+  // A `list` operation is parameterized entirely by the node's own parameters,
+  // not by the incoming item data, so it must run exactly once. Looping over
+  // every input item would fetch and emit the full result set once per item,
+  // producing duplicated records when the node receives more than one item.
+  const itemIndex = 0;
 
-      if (operation !== 'list') {
-        throw new NodeOperationError(this.getNode(), `Unsupported operation: ${String(operation)}`, {
-          itemIndex,
-        });
-      }
+  try {
+    const operation = this.getNodeParameter('operation', itemIndex) as QualysVmdrOtOperation;
 
-      const records = await executeList.call(this, itemIndex);
-      returnData.push(...records);
-    } catch (error) {
-      if (this.continueOnFail()) {
-        returnData.push({
-          json: {
-            error: (error as Error).message,
-          },
-          pairedItem: {
-            item: itemIndex,
-          },
-        });
-        continue;
-      }
-
-      throw error;
+    if (operation !== 'list') {
+      throw new NodeOperationError(this.getNode(), `Unsupported operation: ${String(operation)}`, {
+        itemIndex,
+      });
     }
+
+    const records = await executeList.call(this, itemIndex);
+    returnData.push(...records);
+  } catch (error) {
+    if (this.continueOnFail()) {
+      returnData.push({
+        json: {
+          error: (error as Error).message,
+        },
+        pairedItem: {
+          item: itemIndex,
+        },
+      });
+
+      return [returnData];
+    }
+
+    throw error;
   }
 
   return [returnData];
