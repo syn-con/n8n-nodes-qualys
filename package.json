@@ -1,6 +1,6 @@
 {
   "name": "@syn-con/n8n-nodes-qualys",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "n8n community node for Qualys VMDR OT",
   "keywords": [
     "n8n-community-node-package",

@@ -266,6 +266,9 @@ export function buildFilterExpression(parameters: IDataObject): string {
 
 export function buildSortExpression(resource: QualysVmdrOtResource, sorts: IDataObject): string {
   const rules = getCollectionEntries(sorts, 'sorts') as Array<Record<string, unknown>>;
+  if (rules.length === 0) {
+    return '';
+  }
   const sortRules: Array<Record<string, string>> = [];
 
   for (const rule of rules) {
