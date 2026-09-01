@@ -1,5 +1,5 @@
 {
-  "name": "@syn-con/n8n-nodes-qualys",
+  "name": "@synergyconsulting/n8n-nodes-qualys",
   "version": "2.0.1",
   "description": "n8n community node for Qualys VMDR, VMDR OT and CyberSecurity Asset Management",
   "keywords": [
@@ -33,7 +33,8 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test tests/*.test.cjs",
     "test:coverage": "npm run build && node --test --experimental-test-coverage --test-coverage-exclude=tests/** --test-coverage-branches=90 --test-coverage-lines=90 --test-coverage-functions=90 tests/*.test.cjs",
-    "prepublishOnly": "npm run build"
+    "release": "n8n-node release",
+    "prepublishOnly": "n8n-node prerelease"
   },
   "files": [
     "dist"
@@ -61,7 +62,7 @@
     "n8n-workflow": "*"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public"
   },
   "dependencies": {
     "fast-xml-parser": "^5.11.1"

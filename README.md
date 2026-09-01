@@ -30,28 +30,17 @@ the new **Client Type** field.
 
 ## Installation
 
-Published to GitHub Packages, not the public npm registry, so the scope needs pointing at it
-once. In `.npmrc` (user-level, or beside the install target):
-
-```ini
-@syn-con:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
-```
-
-The token needs `read:packages`. Then:
-
 ```bash
-npm install @syn-con/n8n-nodes-qualys
+npm install @synergyconsulting/n8n-nodes-qualys
 ```
 
 For a self-hosted n8n, install it into the custom-nodes folder n8n already reads:
 
 ```bash
-cd ~/.n8n/custom && npm install @syn-con/n8n-nodes-qualys
+cd ~/.n8n/custom && npm install @synergyconsulting/n8n-nodes-qualys
 ```
 
-Installing from the n8n UI's community-nodes screen only works for packages on the public
-registry, so it will not find this one.
+It is also installable from the n8n UI's community-nodes screen, under that package name.
 
 ## Credentials
 
@@ -361,8 +350,13 @@ mapping — is driven from canned responses rather than a live subscription.
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `ci.yml` | pull requests, pushes to `main` | typecheck, lint, tests with the coverage gate |
-| `publish.yml` | pushes to `main` that change `package.json` | publishes to GitHub Packages when the version is new, then tags `v<version>` |
-| `main.yml` | `v*` tags | attaches `dist.zip` to a GitHub release |
+| `publish.yml` | version tags (`2.0.1`, `2.1.0-rc.1`, …) | tests, then publishes to npm with a provenance attestation |
 
-`publish.yml` skips itself when the version already exists, so bumping the version in
-`package.json` is the whole release action. The tag it pushes triggers `main.yml`.
+Releases are cut locally with `npm run release`, which lints, builds, prompts for the version
+bump, writes the changelog, commits, tags and pushes. The tag is what triggers `publish.yml`;
+that job republishes nothing on its own.
+
+Provenance is what lets n8n verify the package, and it is only produced when npm publishes
+from this workflow — `prepublishOnly` blocks a bare `npm publish` so a release cannot
+accidentally go out without it. Authentication is either npm Trusted Publishing via OIDC (no
+stored secret) or an `NPM_TOKEN` repository secret; `publish.yml` documents both.

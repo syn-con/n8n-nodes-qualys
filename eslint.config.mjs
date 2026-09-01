@@ -18,9 +18,6 @@ export default [
 	{
 		files: ['package.json'],
 		rules: {
-			// This node is derived from n8n's Sustainable Use Licensed source, so the
-			// package cannot claim MIT. See LICENSE.md.
-			'n8n-nodes-base/community-package-json-license-not-default': 'off',
 			// See the note on no-restricted-imports below: the fast-xml-parser
 			// dependency is deliberate, and this package is not distributed through
 			// n8n Cloud.
