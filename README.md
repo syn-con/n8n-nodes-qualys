@@ -314,6 +314,8 @@ Then open http://localhost:5678 and add a **Qualys** node to a workflow.
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | 164 tests |
 | `npm run test:coverage` | Same, with a 90% line/branch/function gate |
+| `npm run format` | Prettier over the sources, tests and config |
+| `npm run release` | `n8n-node release` — bumps, tags and pushes; the tag publishes |
 
 ### Requirements
 
@@ -353,8 +355,12 @@ mapping — is driven from canned responses rather than a live subscription.
 | `publish.yml` | version tags (`2.0.1`, `2.1.0-rc.1`, …) | tests, then publishes to npm with a provenance attestation |
 
 Releases are cut locally with `npm run release`, which lints, builds, prompts for the version
-bump, writes the changelog, commits, tags and pushes. The tag is what triggers `publish.yml`;
-that job republishes nothing on its own.
+bump, writes the changelog, commits, tags and pushes. Pushing that tag is the only thing that
+publishes — the workflow never bumps a version or creates a tag of its own.
+
+The trigger matches unprefixed tags, the shape `release-it` writes. Tags left over from the
+old workflow are `v`-prefixed (`v2.0.1`, `v2.0.2`) and will not fire it; to publish a version
+that is already in `package.json`, push the tag without the `v`.
 
 Provenance is what lets n8n verify the package, and it is only produced when npm publishes
 from this workflow — `prepublishOnly` blocks a bare `npm publish` so a release cannot
