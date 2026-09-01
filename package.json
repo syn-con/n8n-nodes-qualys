@@ -1,6 +1,6 @@
 {
   "name": "@syn-con/n8n-nodes-qualys",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "n8n community node for Qualys VMDR, VMDR OT and CyberSecurity Asset Management",
   "keywords": [
     "n8n-community-node-package",
