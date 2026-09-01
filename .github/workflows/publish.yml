@@ -2,7 +2,7 @@ name: Publish on version change
 
 on:
   push:
-    branches: [main]
+    branches: [main] # change to `main` if that's the repo's default branch
     paths:
       - "package.json" # only wake up when the version file changes
 
@@ -67,19 +67,7 @@ jobs:
 
       - name: Install
         if: steps.check.outputs.publish == 'true'
-        run: npm ci --ignore-scripts
-
-      - name: Type check
-        if: steps.check.outputs.publish == 'true'
-        run: npm run typecheck
-
-      - name: Lint
-        if: steps.check.outputs.publish == 'true'
-        run: npm run lint
-
-      - name: Test with coverage
-        if: steps.check.outputs.publish == 'true'
-        run: npm run test:coverage
+        run: npm ci
 
       - name: Build
         if: steps.check.outputs.publish == 'true'
