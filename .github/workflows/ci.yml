@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # isolated-vm (pulled in by @n8n/node-cli) asks for Node >= 24 and needs a
+      # native toolchain. It is only used by the n8n runtime the dev server
+      # downloads, so CI does not need it built.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test with coverage
+        run: npm run test:coverage

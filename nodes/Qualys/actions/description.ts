@@ -1,286 +1,147 @@
-import { NodeConnectionType, type INodeProperties, type INodeTypeDescription } from 'n8n-workflow';
+import type { INodeProperties } from 'n8n-workflow';
 
-export const resourceProperty: INodeProperties = {
+import { COUNT_OPS, LIST_OPS } from './operationScopes';
+import { csamProperties } from './parameters/csam';
+import { otFilterProperties } from './parameters/ot';
+import { foProperties } from './parameters/platform';
+import { RESOURCES } from './resources';
+
+/** n8n's linter wants dropdown entries in alphabetical order. */
+const byName = <T extends { name: string }>(entries: T[]): T[] =>
+  [...entries].sort((a, b) => a.name.localeCompare(b.name));
+
+const resourceProperty: INodeProperties = {
   displayName: 'Resource',
   name: 'resource',
   type: 'options',
   noDataExpression: true,
-  options: [
-    {
-      name: 'OT Host Asset',
-      value: 'asset',
-      description: 'Asset list',
-    },
-    {
-      name: 'OT Vulnerability',
-      value: 'vulnerability',
-      description: 'Vulnerability list',
-    },
-    {
-      name: 'Project File',
-      value: 'projectFile',
-      description: 'Project files',
-    },
-  ],
-  default: 'asset',
+  options: byName(
+    Object.entries(RESOURCES).map(([value, definition]) => ({
+      name: definition.name,
+      value,
+      description: definition.description,
+    })),
+  ),
+  default: 'itAsset',
 };
 
-export const operationProperty: INodeProperties = {
-  displayName: 'Operation',
-  name: 'operation',
-  type: 'options',
-  noDataExpression: true,
-  options: [
-    {
-      name: 'List',
-      value: 'list',
-      description: 'List records',
-      action: 'List records',
-    },
-  ],
-  default: 'list',
-};
+/**
+ * One dropdown per resource, naming the records that resource can read.
+ *
+ * `node-param-default-missing` reads defaults out of the syntax tree, so it
+ * cannot see one computed per resource. The default is set below, and a test
+ * asserts every dropdown defaults to an operation it actually offers - a
+ * stronger check than the rule performs.
+ */
+const operationProperties: INodeProperties[] = Object.entries(RESOURCES).map(
+  // eslint-disable-next-line n8n-nodes-base/node-param-default-missing
+  ([resource, definition]) => ({
+    displayName: 'Operation',
+    name: 'operation',
+    type: 'options',
+    noDataExpression: true,
+    options: byName(
+      Object.entries(definition.operations).map(([value, operation]) => ({
+        name: operation.name,
+        value,
+        description: operation.description,
+        action: operation.action,
+      })),
+    ),
+    default: Object.keys(definition.operations)[0],
+    displayOptions: { show: { resource: [resource] } },
+  }),
+);
 
-export const listProperties: INodeProperties[] = [
+// ------------------------------------------------------------ shared paging UI
+
+const pagingProperties: INodeProperties[] = [
+  {
+    displayName: 'Run Once For All Items',
+    name: 'runOnce',
+    type: 'boolean',
+    default: true,
+    description:
+      'Whether to run a single query regardless of how many input items arrive. Turn this off to run the query once per input item, so that parameters and filters can reference each item with expressions.',
+    displayOptions: { show: { operation: [...LIST_OPS, ...COUNT_OPS] } },
+  },
   {
     displayName: 'List All',
     name: 'listAll',
     type: 'boolean',
     default: false,
-    description: 'Return all records.',
-    displayOptions: {
-      show: {
-        operation: ['list'],
-      },
-    },
+    description: 'Whether to return every matching record, paging until the API is exhausted',
+    displayOptions: { show: { operation: LIST_OPS } },
   },
   {
     displayName: 'Count',
     name: 'count',
     type: 'number',
     default: 100,
-    typeOptions: {
-      minValue: 0,
-      numberPrecision: 0,
-    },
-    description: 'Records to return. Use 0 with List All.',
-    displayOptions: {
-      show: {
-        operation: ['list'],
-      },
-    },
+    typeOptions: { minValue: 0, numberPrecision: 0 },
+    description: 'Maximum records to return. Ignored when List All is enabled.',
+    displayOptions: { show: { operation: LIST_OPS, listAll: [false] } },
   },
   {
     displayName: 'Skip',
     name: 'skip',
     type: 'number',
     default: 0,
-    typeOptions: {
-      minValue: 0,
-      numberPrecision: 0,
-    },
-    description: 'Records to skip.',
-    displayOptions: {
-      show: {
-        operation: ['list'],
-      },
-    },
+    typeOptions: { minValue: 0, numberPrecision: 0 },
+    description: 'Number of leading records to discard',
+    displayOptions: { show: { operation: LIST_OPS } },
   },
+];
+
+// ------------------------------------------------------------------- output
+
+const outputProperties: INodeProperties[] = [
   {
-    displayName: 'Filter Groups',
-    name: 'filterGroups',
-    type: 'fixedCollection',
-    default: {},
-    typeOptions: {
-      multipleValues: true,
-    },
-    description: 'Filter groups.',
+    displayName: 'Item Granularity',
+    name: 'itemGranularity',
+    type: 'options',
+    default: 'detection',
     options: [
-      {
-        name: 'filterGroups',
-        displayName: 'Filter Group',
-        values: [
-          {
-            displayName: 'Filters',
-            name: 'filters',
-            type: 'fixedCollection',
-            default: {},
-            typeOptions: {
-              multipleValues: true,
-            },
-            description: 'Filter rows.',
-            options: [
-              {
-                name: 'filters',
-                displayName: 'Filter Row',
-                values: [
-                  {
-                    displayName: 'Identifier',
-                    name: 'identifier',
-                    type: 'string',
-                    default: '',
-                    description: 'Field.',
-                  },
-                  {
-                    displayName: 'Operator',
-                    name: 'operator',
-                    type: 'options',
-                    noDataExpression: true,
-                    default: ':',
-                    options: [
-                      { name: 'Contains / Equals (:)', value: ':' },
-                      { name: 'Greater Than (>)', value: '>' },
-                      { name: 'Greater Than or Equal (>=)', value: '>=' },
-                      { name: 'Less Than (<)', value: '<' },
-                      { name: 'Less Than or Equal (<=)', value: '<=' },
-                      { name: 'Not Equal (!=)', value: '!=' },
-                      { name: 'Is Null', value: 'is null' },
-                      { name: 'Is Not Null', value: 'is not null' },
-                    ],
-                    description: 'Operator.',
-                  },
-                  {
-                    displayName: 'Value',
-                    name: 'value',
-                    type: 'string',
-                    default: '',
-                    description: 'Value.',
-                  },
-                  {
-                    displayName: 'Join',
-                    name: 'join',
-                    type: 'options',
-                    noDataExpression: true,
-                    options: [
-                      { name: 'AND', value: 'AND' },
-                      { name: 'OR', value: 'OR' },
-                    ],
-                    default: 'AND',
-                    description: 'Next row join.',
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            displayName: 'Join',
-            name: 'join',
-            type: 'options',
-            noDataExpression: true,
-            options: [
-              { name: 'AND', value: 'AND' },
-              { name: 'OR', value: 'OR' },
-            ],
-            default: 'AND',
-            description: 'Next group join.',
-          },
-        ],
-      },
+      { name: 'Detection', value: 'detection', description: 'One item per detection, flattened with its host context' },
+      { name: 'Host', value: 'host', description: 'One item per host, with detections nested' },
     ],
-    displayOptions: {
-      show: {
-        operation: ['list'],
-      },
-    },
-  },
-  {
-    displayName: 'Sorts',
-    name: 'sorts',
-    type: 'fixedCollection',
-    default: {},
-    typeOptions: {
-      multipleValues: true,
-    },
-    description: 'Sort rules.',
-    options: [
-      {
-        name: 'sorts',
-        displayName: 'Sort Rule',
-        values: [
-          {
-            displayName: 'Field',
-            name: 'field',
-            type: 'string',
-            default: '',
-            description: 'Field.',
-          },
-          {
-            displayName: 'Direction',
-            name: 'direction',
-            type: 'options',
-            default: 'asc',
-            options: [
-              { name: 'Ascending', value: 'asc' },
-              { name: 'Descending', value: 'desc' },
-            ],
-            description: 'Direction.',
-          },
-        ],
-      },
-    ],
-    displayOptions: {
-      show: {
-        operation: ['list'],
-      },
-    },
+    description: 'How detections are split into items',
+    displayOptions: { show: { operation: ['listDetections'] } },
   },
   {
     displayName: 'Output Mode',
     name: 'outputMode',
     type: 'options',
     options: [
-      {
-        name: 'Items',
-        value: 'items',
-        description: 'One item per record.',
-      },
-      {
-        name: 'Raw Response',
-        value: 'raw',
-        description: 'Return the raw response.',
-      },
+      { name: 'Items', value: 'items', description: 'One item per record' },
+      { name: 'Raw Response', value: 'raw', description: 'A single item holding every page verbatim' },
     ],
     default: 'items',
-    displayOptions: {
-      show: {
-        operation: ['list'],
-      },
-    },
+    description: 'How the response is emitted',
+    displayOptions: { show: { operation: LIST_OPS } },
   },
   {
     displayName: 'Add Response Metadata',
     name: 'includeMetadata',
     type: 'boolean',
     default: false,
-    description: 'Add metadata.',
-    displayOptions: {
-      show: {
-        operation: ['list'],
-        outputMode: ['items'],
-      },
-    },
+    description: 'Whether to attach a _qualys object carrying endpoint, paging and rate limit details',
+    displayOptions: { show: { operation: LIST_OPS, outputMode: ['items'] } },
   },
 ];
 
-export const description: INodeTypeDescription = {
-  displayName: 'Qualys VMDR OT',
-  name: 'qualysVmdrOt',
-  group: ['transform'],
-  icon: 'file:qualys.svg',
-  version: 1,
-  subtitle: '={{ $parameter["resource"] + ": " + $parameter["operation"] }}',
-  description: 'Qualys VMDR OT node',
-  defaults: {
-    name: 'Qualys VMDR OT',
-  },
-  inputs: [NodeConnectionType.Main],
-  outputs: [NodeConnectionType.Main],
-  usableAsTool: true,
-  credentials: [
-    {
-      name: 'qualysVmdrOtApi',
-      required: true,
-    },
-  ],
-  properties: [resourceProperty, operationProperty, ...listProperties],
-};
+const listProperties: INodeProperties[] = [
+  ...pagingProperties,
+  ...otFilterProperties,
+  ...csamProperties,
+  ...foProperties,
+  ...outputProperties,
+];
+
+/** Every parameter the node shows, in panel order. */
+export const properties: INodeProperties[] = [
+  resourceProperty,
+  ...operationProperties,
+  ...listProperties,
+];
+
