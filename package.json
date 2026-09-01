@@ -1,5 +1,5 @@
 {
-  "name": "@synergyconsulting/n8n-nodes-qualys",
+  "name": "@syncon/n8n-nodes-qualys",
   "version": "2.0.3",
   "description": "n8n community node for Qualys VMDR, VMDR OT and CyberSecurity Asset Management",
   "keywords": [
