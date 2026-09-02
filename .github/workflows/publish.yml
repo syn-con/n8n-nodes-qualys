@@ -2,7 +2,7 @@ name: Publish on version change
 
 on:
   push:
-    branches: [maim] # change to `main` if that's the repo's default branch
+    branches: [main] # change to `main` if that's the repo's default branch
     paths:
       - "package.json" # only wake up when the version file changes
   workflow_dispatch: # allow manual re-runs after a failed publish
