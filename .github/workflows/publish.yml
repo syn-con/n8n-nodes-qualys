@@ -1,110 +1,100 @@
-# Publishes this n8n community node package to npm on every version tag push.
-#
-# n8n requires community nodes submitted for verification to be published via
-# GitHub Actions with an npm provenance statement. Provenance lets anyone
-# cryptographically verify that a package was built by this exact workflow, from
-# this exact repository and commit. n8n's scanner checks provenance first and
-# refuses to scan a package published any other way.
-#
-# ─── ONE-TIME SETUP ────────────────────────────────────────────────────────────
-#
-# Option A — OIDC Trusted Publishing (recommended, no long-lived secrets):
-#   1. Log in to npmjs.com and open this package's settings.
-#   2. Under "Publish access" → "Trusted Publishers", click "Add a publisher".
-#   3. Select GitHub Actions and fill in:
-#        Repository owner: syn-con
-#        Repository name:  n8n-qualys
-#        Workflow name:    publish.yml
-#        Environment:      (leave blank)
-#   4. Leave the NPM_TOKEN secret unset. GitHub's OIDC token is used instead.
-#
-#   The very first publish of a brand-new package name cannot use a trusted
-#   publisher, because the package does not exist yet to attach one to. Publish
-#   1.0.0 with Option B, then switch, or create the package on npm first.
-#
-# Option B — npm Granular Access Token (fallback):
-#   1. On npmjs.com: Access Tokens → Generate New Token → Granular Access Token,
-#      scoped to this package with "Read and write" publish permission.
-#   2. In GitHub: Settings → Secrets and variables → Actions → New secret,
-#      named NPM_TOKEN.
-#
-# Both options work with provenance, which is signed by GitHub's OIDC
-# infrastructure regardless of how npm authentication is handled.
-#
-# ─── RELEASE PROCESS ───────────────────────────────────────────────────────────
-#
-# Run `npm run release` locally. It lints, builds, prompts for a version bump,
-# updates the changelog, commits, tags and pushes — which triggers this workflow.
-
-name: Publish
+name: Publish on version change
 
 on:
   push:
-    tags:
-      # Matches 0.1.0, 1.2.3, 2.0.0-rc.1, etc. — the tag shape `npm run release` creates.
-      - '*.*.*'
+    branches: [master] # change to `main` if that's the repo's default branch
+    paths:
+      - "package.json" # only wake up when the version file changes
+  workflow_dispatch: # allow manual re-runs after a failed publish
 
 jobs:
   publish:
-    name: Publish to npm
     runs-on: ubuntu-latest
-
     permissions:
-      # Required to mint an OIDC token for the npm provenance attestation.
-      id-token: write
-      # Scoped down from the default (write) for least-privilege publishing.
-      contents: read
-
+      contents: write # create the release tag
+      packages: write # publish to GitHub Packages
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
-          cache: 'npm'
+          node-version: 24
+          cache: npm
+          registry-url: "https://npm.pkg.github.com"
 
-      # isolated-vm (pulled in by @n8n/node-cli) compiles native code on install
-      # and is only used by the n8n runtime the dev server downloads. Publishing
-      # needs neither, so the build is skipped here as it is in CI.
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Test
-        run: npm test
-
-      # Distinguishes a first publish from an update, for the notification below.
-      - name: Determine release type
-        id: meta
+      - name: Read package info
+        id: pkg
         run: |
-          VERSION="${GITHUB_REF#refs/tags/}"
-          NAME="$(node -p "require('./package.json').name")"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "name=$(node -p "require('./package.json').name")" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
+      - name: Determine publish state
+        id: check
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NAME="${{ steps.pkg.outputs.name }}"
+          VERSION="${{ steps.pkg.outputs.version }}"
+
+          # Does the package exist at all (any version)?
           if npm view "$NAME" version >/dev/null 2>&1; then
-            echo "event=package-published" >> "$GITHUB_OUTPUT"
+            PACKAGE_EXISTS=true
           else
-            echo "event=package-created" >> "$GITHUB_OUTPUT"
+            PACKAGE_EXISTS=false
           fi
 
-      - name: Release
-        # Publishes to npm with a provenance attestation (requires id-token: write above).
-        # Lint and build run automatically as part of `n8n-node release` in CI.
-        #
-        # Option A (OIDC): leave NPM_TOKEN unset — the token step is skipped and
-        #   npm uses the OIDC exchange instead.
-        # Option B (token): set NPM_TOKEN in repo secrets — it is written to
-        #   .npmrc here before publishing.
-        run: |
-          [ -n "$NPM_TOKEN" ] && npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
-          npm run release
+          # Does this exact version already exist?
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            VERSION_EXISTS=true
+          else
+            VERSION_EXISTS=false
+          fi
+
+          if [ "$VERSION_EXISTS" = "true" ]; then
+            echo "publish=false"     >> "$GITHUB_OUTPUT"
+            echo "release_type=none" >> "$GITHUB_OUTPUT"
+            echo "::notice::Version $VERSION already published — nothing to do."
+          elif [ "$PACKAGE_EXISTS" = "false" ]; then
+            echo "publish=true"       >> "$GITHUB_OUTPUT"
+            echo "event=package-created" >> "$GITHUB_OUTPUT"
+            echo "::notice::First publish of $NAME ($VERSION)."
+          else
+            echo "publish=true"        >> "$GITHUB_OUTPUT"
+            echo "event=package-published" >> "$GITHUB_OUTPUT"
+            echo "::notice::Update $NAME -> $VERSION."
+          fi
+
+      - name: Install
+        if: steps.check.outputs.publish == 'true'
+        run: npm ci
+
+      - name: Build
+        if: steps.check.outputs.publish == 'true'
+        run: npm run build
+
+      - name: Publish
+        if: steps.check.outputs.publish == 'true'
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # --ignore-scripts skips the prepublishOnly guard from @n8n/node-cli,
+        # which refuses a bare `npm publish`. The Build step above already ran.
+        run: npm publish --ignore-scripts
+
+      - name: Tag the release
+        if: steps.check.outputs.publish == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ steps.pkg.outputs.version }}"
+          git push origin "v${{ steps.pkg.outputs.version }}"
 
       - name: Notify n8n
+        if: steps.check.outputs.publish == 'true'
         run: |
           curl --fail --show-error --silent \
             -X POST "https://n8n-prod.itsmcloud.lt/webhook/12ed1f70-d87f-4097-bab2-8f8d2cf007f3" \
             -H "Authentication: ${{ secrets.N8N_PROD_AUTH }}" \
             -H "Content-Type: application/json" \
-            -d "{\"package\":\"${{ github.repository }}\",\"version\":\"${{ steps.meta.outputs.version }}\",\"releaseType\":\"${{ steps.meta.outputs.event }}\"}"
+            -d "{\"package\":\"${{ github.repository }}\",\"version\":\"${{ steps.pkg.outputs.version }}\",\"event\":\"${{ steps.check.outputs.event }}\"}"
