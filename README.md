@@ -22,11 +22,9 @@ node, reselect the resource and operation, and the fields underneath come back w
 saved values. A node left unmigrated fails at run time with `Unsupported operation`, not
 silently.
 
-The credential is simpler too: one API client instead of two, with a **Client Type** picker
-for the token endpoint. A stored 1.x credential keeps working — its client 1 becomes the
-client, and a Subscription Level grant is still honoured under the old field name — but a
-client that was only in slot 2 needs re-entering. Open and save the credential once to write
-the new **Client Type** field.
+The credential is simpler too: one API client instead of two. A stored 1.x credential keeps
+working — its client 1 becomes the client, and a Subscription Level grant is still honoured
+under the old field name — but a client that was only in slot 2 needs re-entering.
 
 ## Installation
 
@@ -56,7 +54,7 @@ Then fill in the secrets. There are two, and neither reaches every API on its ow
 |---|---|---|
 | OT | yes | yes |
 | IT Asset, EASM domains | no | **yes — required** |
-| Vulnerability, Host, Scope, Scan, Search List | yes | yes |
+| VMDR | yes | yes |
 | EASM profiles | yes | yes |
 
 The Asset Management API rejects API client credentials outright, answering
@@ -69,17 +67,13 @@ application`, but accepts HTTP Basic. So:
 - Supplying both lets the node pick per request, which is what it does by default: the client
   where the API accepts one, the username and password where it does not.
 
-**Client Type** is the one thing you have to get right. API clients come from **User info →
-View Profile → Auth ID Client Management** in the Qualys UI (requires UI 4.0), and that screen
-shows which kind you created:
+API clients come from **User info → View Profile → Auth ID Client Management** in the Qualys
+UI (requires UI 4.0). **Client Type** offers User Level, which mints its token at
+`/auth/oidc`; such a client stops working when the user it belongs to is deactivated.
 
-| Client Type | Token endpoint | Lifetime |
-|---|---|---|
-| User Level | `/auth/oidc` | stops working when the user is deactivated |
-| Subscription Level | `/auth/oauth` | survives user deactivation |
-
-Picking the wrong one fails authentication at the token endpoint, before any Qualys data is
-touched, and the error names the endpoint it tried.
+Subscription Level clients (`/auth/oauth`, which survive user deactivation) are not offered.
+A credential saved before they were withdrawn keeps using that endpoint — the transport still
+honours the stored setting — but new credentials cannot be pointed at it.
 
 The credential's **Test** button checks each secret against the token endpoint it will
 actually use, and says which APIs the result reaches — including telling you that a
@@ -97,8 +91,8 @@ Tokens are cached for their four-hour lifetime and refreshed automatically.
 
 ## Resources and operations
 
-Resources group endpoints by what the data is; the operation names the record. Eight
-resources, 26 operations.
+Resources group endpoints by what the data is; the operation names the record. Four
+resources, 26 operations — one per Qualys product surface.
 
 **OT** — operational technology inventory, from the VMDR OT gateway
 
@@ -118,45 +112,25 @@ resources, 26 operations.
 | List Software Components | `/rest/2.0/am/asset/component` |
 | Get Software Components | `/rest/2.0/am/asset/component/{assetId}` |
 
-**Vulnerability** — detections, vulnerability metadata and CVE risk scores (platform API)
+**VMDR** — Vulnerability Management, Detection and Response, on the platform API
 
 | Operation | Qualys endpoint |
 |---|---|
 | List Detections | `/api/5.0/fo/asset/host/vm/detection/` |
 | List KnowledgeBase | `/api/4.0/fo/knowledge_base/vuln/` |
 | List CVE Scores | `/api/2.0/fo/knowledge_base/qvs/` |
-
-**Host** — scanned hosts and virtual host configuration (platform API)
-
-| Operation | Qualys endpoint |
-|---|---|
 | List Hosts | `/api/5.0/fo/asset/host/` |
 | List Virtual Hosts | `/api/2.0/fo/asset/vhost/` |
-
-**Scope** — what is in and out of scope (platform API)
-
-| Operation | Qualys endpoint |
-|---|---|
 | List Asset Groups | `/api/2.0/fo/asset/group/` |
 | List Networks | `/api/2.0/fo/network/` |
 | List Domains | `/api/2.0/fo/asset/domain/` |
 | List IP Addresses | `/api/2.0/fo/asset/ip/` |
 | List Excluded Hosts | `/api/2.0/fo/asset/excluded_ip/` |
-
-**Scan** — scan history, the appliances that run them, the reports they produce (platform API)
-
-| Operation | Qualys endpoint |
-|---|---|
 | List Scans | `/api/2.0/fo/scan/` |
 | List Scanner Appliances | `/api/2.0/fo/appliance/` |
 | List Reports | `/api/3.0/fo/report/` |
-
-**Search List** — saved QID search lists (platform API)
-
-| Operation | Qualys endpoint |
-|---|---|
-| List Static | `/api/2.0/fo/qid/search_list/static/` |
-| List Dynamic | `/api/3.0/fo/qid/search_list/dynamic/` |
+| List Static Search Lists | `/api/2.0/fo/qid/search_list/static/` |
+| List Dynamic Search Lists | `/api/3.0/fo/qid/search_list/dynamic/` |
 
 **EASM** — external attack surface discovery
 
@@ -172,8 +146,8 @@ each since moved a version on.
 
 Two notes on specific operations. **List IP Addresses** and **List Excluded Hosts** return one
 item holding the whole IP set, because Qualys mixes bare addresses and ranges in the same
-container. **List Dynamic** is slow — Qualys evaluates each list's QID query server-side, and
-a handful of lists took over two minutes on a small subscription.
+container. **List Dynamic Search Lists** is slow — Qualys evaluates each list's QID query
+server-side, and a handful of lists took over two minutes on a small subscription.
 
 Operation values are unique across resources, which is what lets the panel decide which fields
 to show from the operation alone.
@@ -246,7 +220,7 @@ subscriptions we measured — so parallel fetching would simply fail.
 
 **Output Mode** is either one item per record or the raw response, page by page.
 
-**Vulnerability > List Detections** additionally offers **Item Granularity**: one item per
+**VMDR > List Detections** additionally offers **Item Granularity**: one item per
 detection with its host context flattened in (the default, and what joins cleanly against the
 other operations), or one item per host with detections nested.
 

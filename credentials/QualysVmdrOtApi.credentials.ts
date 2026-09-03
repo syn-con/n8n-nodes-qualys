@@ -27,11 +27,10 @@ export class QualysVmdrOtApi implements ICredentialType {
       displayName: 'Platform',
       name: 'pod',
       type: 'options',
-      default: 'custom',
+      default: 'eu1',
       description:
         'Qualys platform your subscription lives on. Both the gateway and the qualysapi host are derived from it. Check Help > About in the Qualys UI if unsure.',
       options: [
-        { name: 'Custom / Private Cloud Platform', value: 'custom' },
         { name: 'AU1 - Australia', value: 'au1' },
         { name: 'CA1 - Canada', value: 'ca1' },
         { name: 'EU1 - Europe 1', value: 'eu1' },
@@ -46,6 +45,8 @@ export class QualysVmdrOtApi implements ICredentialType {
         { name: 'US2 - United States 2', value: 'us2' },
         { name: 'US3 - United States 3', value: 'us3' },
         { name: 'US4 - United States 4', value: 'us4' },
+        // Last, because it is the escape hatch rather than a platform anyone picks first.
+        { name: 'Custom / Private Cloud Platform', value: 'custom' },
       ],
     },
     {
@@ -84,10 +85,9 @@ export class QualysVmdrOtApi implements ICredentialType {
       type: 'options',
       default: 'oidc',
       description:
-        'Which kind of client this is, which decides the token endpoint. User Level clients stop working when the user is deactivated; Subscription Level clients survive it. Auth ID Client Management in the Qualys UI shows which one you created.',
+        'Which kind of client this is, which decides the token endpoint. Auth ID Client Management in the Qualys UI shows which one you created.',
       options: [
         { name: 'User Level (/auth/oidc)', value: 'oidc' },
-        { name: 'Subscription Level (/auth/oauth)', value: 'oauth' },
       ],
     },
     {

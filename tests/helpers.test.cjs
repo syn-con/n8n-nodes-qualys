@@ -608,13 +608,24 @@ test('publishes the Qualys credential with one client and one basic pair', () =>
     'xRequestedWith',
   ]);
 
-  // The client type is what the user picks; both endpoints must be offered.
+  // Only User Level clients are offered. Subscription Level is still honoured
+  // when a stored credential carries it - see the token endpoint tests - but it
+  // is not something a new credential can be pointed at.
   const grant = credential.properties.find((property) => property.name === 'clientGrant');
   assert.deepEqual(
     grant.options.map((option) => option.value),
-    ['oidc', 'oauth'],
+    ['oidc'],
   );
   assert.equal(grant.default, 'oidc');
+
+  const pod = credential.properties.find((property) => property.name === 'pod');
+  assert.equal(pod.default, 'eu1', 'the platform should default to EU1');
+  // Custom is the escape hatch, so it sits at the end rather than the top.
+  assert.equal(pod.options.at(-1).value, 'custom');
+  assert.ok(
+    pod.options.some((option) => option.value === pod.default),
+    'the platform menu does not offer its own default',
+  );
 
   // Secrets must never render in the clear.
   for (const secret of ['clientSecret', 'password']) {

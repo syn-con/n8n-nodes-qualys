@@ -155,9 +155,10 @@ export const RESOURCES: Record<QualysResource, ResourceDefinition> = {
     },
   },
 
-  vulnerability: {
-    name: 'Vulnerability',
-    description: 'Detections, vulnerability metadata and CVE risk scores',
+  vmdr: {
+    name: 'VMDR',
+    description:
+      'Vulnerability Management, Detection and Response: detections, hosts, scan scope, scans and search lists',
     operations: {
       listDetections: list({
         name: 'List Detections',
@@ -192,13 +193,6 @@ export const RESOURCES: Record<QualysResource, ResourceDefinition> = {
         keyedRecords: 'cve',
         optionsProperty: 'cveScoreOptions',
       }),
-    },
-  },
-
-  host: {
-    name: 'Host',
-    description: 'Scanned hosts and virtual host configuration',
-    operations: {
       listHosts: list({
         name: 'List Hosts',
         action: 'List scanned hosts',
@@ -221,13 +215,6 @@ export const RESOURCES: Record<QualysResource, ResourceDefinition> = {
         apiAction: 'list',
         recordPath: 'VIRTUAL_HOST_LIST_OUTPUT.RESPONSE.VIRTUAL_HOST_LIST.VHOST',
       }),
-    },
-  },
-
-  scope: {
-    name: 'Scope',
-    description: 'What is in and out of scope: asset groups, networks, domains, addresses',
-    operations: {
       listAssetGroups: list({
         name: 'List Asset Groups',
         action: 'List asset groups',
@@ -284,13 +271,6 @@ export const RESOURCES: Record<QualysResource, ResourceDefinition> = {
         apiAction: 'list',
         recordPath: 'IP_LIST_OUTPUT.RESPONSE.IP_SET',
       }),
-    },
-  },
-
-  scan: {
-    name: 'Scan',
-    description: 'Scan history, the appliances that run them and the reports they produce',
-    operations: {
       listScans: list({
         name: 'List Scans',
         action: 'List scans',
@@ -323,15 +303,8 @@ export const RESOURCES: Record<QualysResource, ResourceDefinition> = {
         recordPath: 'REPORT_LIST_OUTPUT.RESPONSE.REPORT_LIST.REPORT',
         optionsProperty: 'reportOptions',
       }),
-    },
-  },
-
-  searchList: {
-    name: 'Search List',
-    description: 'Saved QID search lists used to scope scans and reports',
-    operations: {
       listStaticSearchLists: list({
-        name: 'List Static',
+        name: 'List Static Search Lists',
         action: 'List static search lists',
         description: 'Search lists with a fixed set of QIDs',
         plane: 'fo',
@@ -342,7 +315,7 @@ export const RESOURCES: Record<QualysResource, ResourceDefinition> = {
         optionsProperty: 'searchListOptions',
       }),
       listDynamicSearchLists: list({
-        name: 'List Dynamic',
+        name: 'List Dynamic Search Lists',
         action: 'List dynamic search lists',
         description:
           'Search lists built from a query. Qualys evaluates these server side and they can be slow.',
