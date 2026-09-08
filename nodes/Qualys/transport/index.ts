@@ -108,7 +108,7 @@ export async function qualysApiRequest(
     let response = await send.call(this, attempt);
 
     // A cached token can be revoked server-side before it expires; retry once.
-    if (response.statusCode === 401 && mode !== 'basic') {
+    if (response.statusCode === 401) {
       response = await send.call(this, { ...attempt, forceRefresh: true });
     }
 
@@ -191,19 +191,10 @@ function applyBody(
 
 async function applyAuth(
   this: QualysRequestContext,
-  options: IHttpRequestOptions,
   headers: IDataObject,
   attempt: Attempt,
 ): Promise<void> {
   const { credentials, hosts, mode, forceRefresh } = attempt;
-
-  if (mode === 'basic') {
-    options.auth = {
-      username: (credentials.username ?? '').trim(),
-      password: credentials.password ?? '',
-    };
-    return;
-  }
 
   if (forceRefresh) {
     invalidateToken(credentials, hosts.gateway, mode);
@@ -243,7 +234,7 @@ async function send(
     ignoreHttpStatusErrors: true,
   };
 
-  await applyAuth.call(this, options, headers, attempt);
+  await applyAuth.call(this, headers, attempt);
   applyBody(options, headers, requestOptions.body);
 
   const response = (await this.helpers.httpRequest(options)) as {
@@ -300,14 +291,14 @@ function explain(statusCode: number, plane: QualysPlane, mode: AuthMode, message
   if (plane === 'csam' && statusCode === 400 && /Invalid Subscription Id/i.test(message)) {
     return withHint(
       message,
-      'The Asset Management API only accepts username/password authentication; API client credentials are rejected with this error even when the subscription is entitled.',
+      'The Asset Management API does not accept API client credentials yet, and reports that as a subscription problem. Qualys support has confirmed client support there is still a work in progress; this node is already wired for it, so the operation will start working once Qualys ships it. Nothing to change here.',
     );
   }
 
   if (plane === 'fo' && statusCode === 401 && /no access for the application/i.test(message)) {
     return withHint(
       message,
-      'The VMDR platform API does not accept username-derived tokens; supply an API client ID and secret, which this node uses in preference, or rely on HTTP Basic.',
+      'The VMDR platform API rejected the token. Check that the API client is entitled to VMDR.',
     );
   }
 

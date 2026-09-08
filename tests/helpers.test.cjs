@@ -86,30 +86,28 @@ test('resolves both hosts from a pod, and from custom URLs', () => {
 
 // ----------------------------------------------------------------------- auth
 
-test('each plane prefers the authentication it actually accepts', () => {
-  // Measured: CSAM rejects client tokens, the platform API rejects user tokens.
-  assert.deepEqual(PLANE_AUTH_ORDER.csam, ['userToken']);
-  assert.deepEqual(PLANE_AUTH_ORDER.fo, ['client', 'basic']);
-  assert.deepEqual(PLANE_AUTH_ORDER.ot, ['client', 'userToken']);
-  assert.deepEqual(PLANE_AUTH_ORDER.gateway, ['client', 'userToken']);
+test('authenticates every plane with the API client, and nothing else', () => {
+  for (const plane of ['ot', 'gateway', 'csam', 'fo']) {
+    assert.deepEqual(PLANE_AUTH_ORDER[plane], ['client'], `${plane} is not client-only`);
+  }
+
+  // No username/password token and no HTTP Basic anywhere, including as a fallback.
+  const modes = new Set(Object.values(PLANE_AUTH_ORDER).flat());
+  assert.deepEqual([...modes], ['client']);
 });
 
-test('selects an authentication mode from what the credential holds', () => {
-  const clientOnly = { clientId: 'a', clientSecret: 'b' };
-  const userOnly = { username: 'u', password: 'p' };
-  const both = { ...clientOnly, ...userOnly };
+test('selects the client on every plane, or nothing without one', () => {
+  const client = { clientId: 'a', clientSecret: 'b' };
 
-  assert.equal(selectAuthMode(clientOnly, 'ot'), 'client');
-  assert.equal(selectAuthMode(clientOnly, 'fo'), 'client');
-  assert.equal(selectAuthMode(clientOnly, 'csam'), undefined);
+  for (const plane of ['ot', 'gateway', 'csam', 'fo']) {
+    // csam included: it does not accept the token yet, but the node sends it so
+    // the operation starts working the day Qualys ships support.
+    assert.equal(selectAuthMode(client, plane), 'client');
+    assert.equal(selectAuthMode({}, plane), undefined);
+  }
 
-  assert.equal(selectAuthMode(userOnly, 'ot'), 'userToken');
-  assert.equal(selectAuthMode(userOnly, 'fo'), 'basic');
-  assert.equal(selectAuthMode(userOnly, 'csam'), 'userToken');
-
-  assert.equal(selectAuthMode(both, 'fo'), 'client');
-  assert.equal(selectAuthMode(both, 'csam'), 'userToken');
-  assert.equal(selectAuthMode({}, 'ot'), undefined);
+  // A leftover username and password from an older credential authenticates nothing.
+  assert.equal(selectAuthMode({ username: 'u', password: 'p' }, 'csam'), undefined);
 });
 
 test('only treats an actual rejection as rate limited', () => {
@@ -590,7 +588,7 @@ test('takes records from a page with skip and count', () => {
 
 // ------------------------------------------------------------- node metadata
 
-test('publishes the Qualys credential with one client and one basic pair', () => {
+test('publishes the Qualys credential with one API client and no password', () => {
   const credential = new QualysVmdrOtApi();
   assert.equal(credential.name, 'qualysVmdrOtApi');
   assert.equal(credential.displayName, 'Qualys API');
@@ -603,8 +601,6 @@ test('publishes the Qualys credential with one client and one basic pair', () =>
     'clientGrant',
     'clientId',
     'clientSecret',
-    'username',
-    'password',
     'xRequestedWith',
   ]);
 
@@ -628,7 +624,7 @@ test('publishes the Qualys credential with one client and one basic pair', () =>
   );
 
   // Secrets must never render in the clear.
-  for (const secret of ['clientSecret', 'password']) {
+  for (const secret of ['clientSecret']) {
     const property = credential.properties.find((entry) => entry.name === secret);
     assert.equal(property.typeOptions.password, true, `${secret} is not masked`);
   }

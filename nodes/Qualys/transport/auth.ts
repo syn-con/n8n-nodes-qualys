@@ -3,23 +3,25 @@ import type { IDataObject, IHttpRequestOptions } from 'n8n-workflow';
 import type { QualysCredential, QualysPlane, QualysRequestContext } from './types';
 
 /**
- * Which authentication each plane accepts, in preference order. Measured against
- * a live subscription; see stuff/00-verified-findings.md.
+ * Every plane authenticates with the API client. There is one mode, and no
+ * fallback: neither HTTP Basic nor a username/password token is used anywhere.
  *
- *   plane   client token   user token   HTTP Basic
- *   ot      yes            yes          no
- *   csam    NO             yes          no
- *   fo      yes            NO           yes
+ * CyberSecurity Asset Management does not accept a client token yet. It answers
+ * `400 Error validating customer from token - Invalid Subscription Id`, which
+ * blames the subscription rather than the credential; Qualys support confirms
+ * client support there is a work in progress, whatever the documentation says.
+ * It is wired up as a client plane regardless, so those operations start working
+ * the day Qualys ships it, with no change here. `explain()` in ./index.ts turns
+ * that 400 into a message saying as much.
  */
-export type AuthMode = 'client' | 'userToken' | 'basic';
+export type AuthMode = 'client';
 
 export const PLANE_AUTH_ORDER: Record<QualysPlane, AuthMode[]> = {
-  ot: ['client', 'userToken'],
-  // Same host and same acceptance as `ot`; separate so messages can name the
-  // right product.
-  gateway: ['client', 'userToken'],
-  csam: ['userToken'],
-  fo: ['client', 'basic'],
+  ot: ['client'],
+  // Same host as `ot`; separate so error messages can name the right product.
+  gateway: ['client'],
+  csam: ['client'],
+  fo: ['client'],
 };
 
 const TOKEN_CACHE = new Map<string, { token: string; expiresAt: number }>();
@@ -45,13 +47,8 @@ export function clientGrant(credentials: QualysCredential): 'oidc' | 'oauth' {
     : 'oidc';
 }
 
-export function hasUser(credentials: QualysCredential): boolean {
-  return Boolean(credentials.username?.trim() && credentials.password?.trim());
-}
-
-export function isConfigured(credentials: QualysCredential, mode: AuthMode): boolean {
-  // `userToken` and `basic` are two ways of using the same username and password.
-  return mode === 'client' ? hasClient(credentials) : hasUser(credentials);
+export function isConfigured(credentials: QualysCredential, _mode: AuthMode): boolean {
+  return hasClient(credentials);
 }
 
 export function selectAuthMode(
@@ -62,24 +59,16 @@ export function selectAuthMode(
 }
 
 export function describeMissingAuth(plane: QualysPlane): string {
-  if (plane === 'csam') {
-    return 'This operation requires a Qualys username and password. The Asset Management API rejects API client credentials, returning a misleading "Invalid Subscription Id" error.';
-  }
-
-  if (plane === 'fo') {
-    return 'This operation requires either an API client ID and secret, or a Qualys username and password.';
-  }
-
   if (plane === 'ot') {
-    return 'VMDR OT operations require either an API client ID and secret, or a Qualys username and password.';
+    return 'VMDR OT operations require an API client ID and secret.';
   }
 
-  return 'This operation requires either an API client ID and secret, or a Qualys username and password.';
+  return 'This operation requires an API client ID and secret.';
 }
 
 function cacheKey(baseUrl: string, mode: AuthMode, credentials: QualysCredential): string {
-  const identity = mode === 'client' ? credentials.clientId : credentials.username;
-  const secret = mode === 'client' ? credentials.clientSecret : credentials.password;
+  const identity = credentials.clientId;
+  const secret = credentials.clientSecret;
 
   // Rotating a secret while keeping the same ID must not keep serving the token
   // minted from the old one, so the secret is fingerprinted into the key.
@@ -161,24 +150,7 @@ const TOKEN_REQUEST_DEFAULTS = {
   ignoreHttpStatusErrors: true,
 } as const;
 
-function tokenRequest(
-  credentials: QualysCredential,
-  gatewayUrl: string,
-  mode: AuthMode,
-): IHttpRequestOptions {
-  if (mode === 'userToken') {
-    return {
-      ...TOKEN_REQUEST_DEFAULTS,
-      url: `${gatewayUrl}/auth`,
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        username: (credentials.username ?? '').trim(),
-        password: credentials.password ?? '',
-        token: 'true',
-      }).toString(),
-    };
-  }
-
+function tokenRequest(credentials: QualysCredential, gatewayUrl: string): IHttpRequestOptions {
   return {
     ...TOKEN_REQUEST_DEFAULTS,
     url: `${gatewayUrl}/auth/${clientGrant(credentials)}`,
@@ -213,11 +185,11 @@ async function mintToken(
   gatewayUrl: string,
   mode: AuthMode,
 ): Promise<string> {
-  const response = (await this.helpers.httpRequest(
-    tokenRequest(credentials, gatewayUrl, mode),
-  )) as { statusCode?: number; body?: unknown };
+  const response = (await this.helpers.httpRequest(tokenRequest(credentials, gatewayUrl))) as {
+    statusCode?: number;
+    body?: unknown;
+  };
 
-  // POST /auth answers 201, POST /auth/{oidc,oauth} answers 200.
   const statusCode = response.statusCode ?? 0;
   if (statusCode < 200 || statusCode > 299) {
     throw new Error(

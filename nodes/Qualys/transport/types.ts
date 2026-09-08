@@ -18,8 +18,6 @@ export type QualysCredential = {
   pod?: string;
   baseUrl?: string;
   platformUrl?: string;
-  username?: string;
-  password?: string;
   clientId?: string;
   clientSecret?: string;
   clientGrant?: string;

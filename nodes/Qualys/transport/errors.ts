@@ -138,8 +138,6 @@ const PLANE_LABELS: Record<QualysPlane, string> = {
 
 const AUTH_LABELS: Record<AuthMode, string> = {
   client: 'API client',
-  userToken: 'username/password token',
-  basic: 'HTTP Basic',
 };
 
 export type FailureContext = {

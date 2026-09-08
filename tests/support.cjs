@@ -58,8 +58,6 @@ function jwt(claims = {}) {
 
 const CREDENTIALS = {
   pod: 'eu2',
-  username: 'user',
-  password: 'pass',
   clientId: 'client-1',
   clientSecret: 'secret-1',
   clientGrant: 'oidc',

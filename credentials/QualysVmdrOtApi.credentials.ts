@@ -1,17 +1,16 @@
 import type { Icon, ICredentialType, INodeProperties } from 'n8n-workflow';
 
 /**
- * Qualys exposes three API planes that do not share an authentication mechanism:
+ * One API client authenticates every request. There is no username/password and
+ * no HTTP Basic fallback.
  *
- *   - gateway `/ot/*`      accepts a client token or a user (password) token
- *   - gateway `/rest/2.0/` accepts ONLY a user token; client tokens are rejected
- *                          with a misleading "Invalid Subscription Id"
- *   - `qualysapi` `/api/*` accepts a client token or HTTP Basic; a user token is
- *                          rejected with "Token has no access for the application"
- *
- * So one API client covers everything except CyberSecurity Asset Management,
- * and a username and password covers everything except the platform API. Supply
- * both to reach all three; the transport picks whichever the target accepts.
+ *   - gateway `/ot/*`      accepts the client token
+ *   - `qualysapi` `/api/*` accepts the client token
+ *   - gateway `/rest/2.0/` does NOT accept it yet, and answers
+ *                          `400 Invalid Subscription Id`. Qualys support
+ *                          confirms client support there is a work in progress.
+ *                          The node is wired for it anyway, so IT Asset and the
+ *                          EASM domain operations start working the day it ships.
  */
 export class QualysVmdrOtApi implements ICredentialType {
   name = 'qualysVmdrOtApi';
@@ -96,7 +95,7 @@ export class QualysVmdrOtApi implements ICredentialType {
       type: 'string',
       default: '',
       description:
-        'Client ID from Auth ID Client Management in the Qualys UI. Reaches every API except CyberSecurity Asset Management, which needs the username and password below.',
+        'Client ID from Auth ID Client Management in the Qualys UI. Reaches every API except CyberSecurity Asset Management, which does not accept client credentials yet.',
     },
     {
       displayName: 'Client Secret',
@@ -106,26 +105,6 @@ export class QualysVmdrOtApi implements ICredentialType {
       typeOptions: {
         password: true,
       },
-    },
-
-    // ------------------------------------------------------ username/password
-    {
-      displayName: 'Username',
-      name: 'username',
-      type: 'string',
-      default: '',
-      description:
-        'Qualys account username. Required for IT Asset and EASM domain operations, which reject client credentials. Optional otherwise, where it also serves as HTTP Basic on the platform API.',
-    },
-    {
-      displayName: 'Password',
-      name: 'password',
-      type: 'string',
-      default: '',
-      typeOptions: {
-        password: true,
-      },
-      description: 'Password for the Qualys account above. SSO must be disabled for API access.',
     },
 
     // ---------------------------------------------------------------- options

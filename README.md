@@ -26,6 +26,11 @@ The credential is simpler too: one API client instead of two. A stored 1.x crede
 working — its client 1 becomes the client, and a Subscription Level grant is still honoured
 under the old field name — but a client that was only in slot 2 needs re-entering.
 
+Authentication is now the API client and nothing else. The username and password fields are
+gone, along with the HTTP Basic fallback, so a credential that carried only those will need an
+API client ID and secret. Asset Management is sent the client token too — it does not accept
+it yet, so IT Asset and the EASM domain operations fail until Qualys ships that support.
+
 ## Installation
 
 ```bash
@@ -50,22 +55,25 @@ Platform and enter the URLs yourself. Help → About in the Qualys UI shows your
 
 Then fill in the secrets. There are two, and neither reaches every API on its own:
 
-| API | API client (ID & secret) | Username & password |
-|---|---|---|
-| OT | yes | yes |
-| IT Asset, EASM domains | no | **yes — required** |
-| VMDR | yes | yes |
-| EASM profiles | yes | yes |
+One API client authenticates every request. There is no username, no password and no HTTP
+Basic fallback — one credential, one mode.
 
-The Asset Management API rejects API client credentials outright, answering
-`400 Invalid Subscription Id` even on an entitled subscription. The VMDR platform API is the
-mirror image: it rejects username-derived tokens with `Token has no access for the
-application`, but accepts HTTP Basic. So:
+**IT Asset and the EASM domain operations do not work yet, and that is a Qualys-side gap.**
+CyberSecurity Asset Management rejects a client token with `400 Error validating customer from
+token - Invalid Subscription Id` — an error that blames your subscription rather than the
+credential. Qualys support confirms client-credential support there is still a work in
+progress, whatever the documentation says.
 
-- **Username and password alone** reach every operation. This is the simplest setup.
-- **An API client alone** reaches everything except IT Asset and EASM domain operations.
-- Supplying both lets the node pick per request, which is what it does by default: the client
-  where the API accepts one, the username and password where it does not.
+The node sends the client token to Asset Management anyway, so those seven operations start
+working the day Qualys ships it, with nothing to change here. Until then they fail, and the
+error explains why rather than sending you to check your entitlements.
+
+| Resource | Works today |
+|---|---|
+| OT | yes |
+| VMDR | yes |
+| EASM profiles | yes |
+| IT Asset, EASM domains | not until Qualys ships client auth for CSAM |
 
 API clients come from **User info → View Profile → Auth ID Client Management** in the Qualys
 UI (requires UI 4.0). **Client Type** offers User Level, which mints its token at
@@ -75,10 +83,9 @@ Subscription Level clients (`/auth/oauth`, which survive user deactivation) are 
 A credential saved before they were withdrawn keeps using that endpoint — the transport still
 honours the stored setting — but new credentials cannot be pointed at it.
 
-The credential's **Test** button checks each secret against the token endpoint it will
-actually use, and says which APIs the result reaches — including telling you that a
-client-only credential cannot read IT Asset or EASM domain data. A wrong **Client Type** shows
-up here as `Invalid Client ID`, before any workflow runs.
+The credential's **Test** button mints a token against the endpoint your **Client Type**
+selects, so a wrong choice shows up as `Invalid Client ID` before any workflow runs. On
+success it reminds you that Asset Management is still pending on the Qualys side.
 
 Tokens are cached for their four-hour lifetime and refreshed automatically.
 
@@ -241,8 +248,10 @@ The **message** is what Qualys said, with an actionable hint appended rather tha
 
 ```
 Error validating customer from token - Invalid Subscription Id. The Asset Management API
-only accepts username/password authentication; API client credentials are rejected with
-this error even when the subscription is entitled.
+does not accept API client credentials yet, and reports that as a subscription problem.
+Qualys support has confirmed client support there is still a work in progress; this node
+is already wired for it, so the operation will start working once Qualys ships it.
+Nothing to change here.
 ```
 
 The **description** identifies the call without needing to reproduce it:
@@ -250,7 +259,7 @@ The **description** identifies the call without needing to reproduce it:
 ```
 Request: POST /rest/2.0/search/am/asset
 API: CyberSecurity Asset Management
-Authenticated with: username/password token
+Authenticated with: API client
 HTTP status: 400
 Qualys code: FAILED
 ```

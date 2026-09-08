@@ -63,30 +63,23 @@ test('an unknown pod value falls through to the custom URLs', () => {
 
 // ----------------------------------------------------------------------- auth
 
-test('reports which authentication each credential shape supports', () => {
+test('treats a credential as configured only with both halves of the client', () => {
   assert.equal(isConfigured({ clientId: 'a', clientSecret: 'b' }, 'client'), true);
   assert.equal(isConfigured({ clientId: 'a' }, 'client'), false);
-  assert.equal(isConfigured({ clientId: ' ', clientSecret: 'b' }, 'client'), false);
   assert.equal(isConfigured({ clientSecret: 'b' }, 'client'), false);
-  assert.equal(isConfigured({ username: 'u', password: 'p' }, 'userToken'), true);
-  assert.equal(isConfigured({ username: 'u', password: 'p' }, 'basic'), true);
-  assert.equal(isConfigured({ username: 'u' }, 'basic'), false);
-});
-
-test('leaves the client unusable on the plane that rejects it', () => {
-  const client = { clientId: 'a', clientSecret: 'b' };
-  assert.equal(selectAuthMode(client, 'ot'), 'client');
-  assert.equal(selectAuthMode(client, 'fo'), 'client');
-  assert.equal(selectAuthMode(client, 'gateway'), 'client');
-  // Asset Management takes a user token only, so a client alone reaches nothing.
-  assert.equal(selectAuthMode(client, 'csam'), undefined);
+  assert.equal(isConfigured({ clientId: ' ', clientSecret: 'b' }, 'client'), false);
+  assert.equal(isConfigured({}, 'client'), false);
 });
 
 test('names what is missing for every plane', () => {
-  assert.match(describeMissingAuth('csam'), /username and password/);
-  assert.match(describeMissingAuth('fo'), /API client ID and secret/);
+  for (const plane of ['csam', 'fo', 'gateway']) {
+    assert.match(describeMissingAuth(plane), /API client ID and secret/);
+  }
   assert.match(describeMissingAuth('ot'), /VMDR OT operations/);
-  assert.match(describeMissingAuth('gateway'), /API client/);
+  // Nothing tells the user to go and find a password any more.
+  for (const plane of ['ot', 'gateway', 'csam', 'fo']) {
+    assert.doesNotMatch(describeMissingAuth(plane), /password/i);
+  }
 });
 
 test('decodes JWT claims and tolerates malformed tokens', () => {
@@ -173,14 +166,6 @@ test('uses the token endpoint the client type selects', async () => {
   await call({ plane: 'ot', endpoint: '/ot/1.0/host/list' }, unset.context);
   assert.match(unset.authCalls[0].url, /\/auth\/oidc$/);
 
-  clearTokenCache();
-  const user = makeContext({
-    script: () => json({ ok: true }),
-    credentials: { pod: 'eu2', username: 'u', password: 'p' },
-  });
-  await call({ plane: 'csam', endpoint: '/rest/2.0/count/am/asset', method: 'POST' }, user.context);
-  assert.match(user.authCalls[0].url, /\/auth$/);
-  assert.match(String(user.authCalls[0].body), /username=u&password=p&token=true/);
 });
 
 test('surfaces an authentication failure with the server message', async () => {
@@ -255,31 +240,57 @@ test('refuses to run without credentials', async () => {
   );
 });
 
-test('refuses a plane the credential cannot authenticate', async () => {
-  const { context } = makeContext({
-    script: () => json({}),
+test('sends the client token to Asset Management too, ready for when it lands', async () => {
+  clearTokenCache();
+  const { context, calls } = makeContext({
+    script: () => json({ count: 0 }),
     credentials: { pod: 'eu2', clientId: 'a', clientSecret: 'b' },
   });
-  await assert.rejects(
-    () => call({ plane: 'csam', endpoint: '/rest/2.0/count/am/asset', method: 'POST' }, context),
-    /username and password/,
-  );
+
+  await call({ plane: 'csam', endpoint: '/rest/2.0/count/am/asset', method: 'POST' }, context);
+  assert.match(calls[0].headers.Authorization, /^Bearer /);
+});
+
+test('refuses every plane when no client is configured', async () => {
+  for (const plane of ['ot', 'gateway', 'csam', 'fo']) {
+    clearTokenCache();
+    const { context } = makeContext({ script: () => json({}), credentials: { pod: 'eu2' } });
+    await assert.rejects(
+      () => call({ plane, endpoint: '/x' }, context),
+      /API client ID and secret/,
+      `${plane} did not ask for a client`,
+    );
+  }
 });
 
 // ------------------------------------------------------------------ requests
 
-test('sends Basic auth and the CSRF header on the platform plane', async () => {
+test('bearers the client token and sends the CSRF header on the platform plane', async () => {
   clearTokenCache();
   const { context, calls } = makeContext({
     script: () => raw(200, '<R><A>1</A></R>'),
-    credentials: { pod: 'eu2', username: 'u', password: 'p' },
+    credentials: { pod: 'eu2', clientId: 'a', clientSecret: 'b', xRequestedWith: '' },
   });
 
   await call({ plane: 'fo', endpoint: '/api/5.0/fo/asset/host/', xml: true }, context);
 
-  assert.deepEqual(calls[0].auth, { username: 'u', password: 'p' });
+  assert.match(calls[0].headers.Authorization, /^Bearer /);
+  // The account password never goes on the request.
+  assert.equal(calls[0].auth, undefined);
   assert.equal(calls[0].headers['X-Requested-With'], 'n8n-nodes-qualys');
-  assert.equal(calls[0].headers.Authorization, undefined);
+});
+
+test('refuses the platform plane when only a username and password are set', async () => {
+  clearTokenCache();
+  const { context } = makeContext({
+    script: () => raw(200, '<R/>'),
+    credentials: { pod: 'eu2', username: 'u', password: 'p' },
+  });
+
+  await assert.rejects(
+    () => call({ plane: 'fo', endpoint: '/api/5.0/fo/asset/host/', xml: true }, context),
+    /requires an API client ID and secret/,
+  );
 });
 
 test('honours a custom X-Requested-With and omits it off the platform plane', async () => {
@@ -365,7 +376,7 @@ test('treats 404 as empty only when the resource opts in', async () => {
   await assert.rejects(() => call({ plane: 'ot', endpoint: '/x' }, strict.context), /none/);
 });
 
-test('retries once after a 401, and does not retry Basic auth', async () => {
+test('retries once after a 401, minting a fresh token', async () => {
   clearTokenCache();
   let n = 0;
   const bearer = makeContext({
@@ -379,17 +390,17 @@ test('retries once after a 401, and does not retry Basic auth', async () => {
   assert.equal(n, 2);
   assert.equal(bearer.authCalls.length, 2);
 
+  // A second 401 is the server's answer, not a stale token; it is not retried again.
   clearTokenCache();
   let m = 0;
-  const basic = makeContext({
+  const stubborn = makeContext({
     script: () => {
       m += 1;
       return raw(401, 'nope');
     },
-    credentials: { pod: 'eu2', username: 'u', password: 'p' },
   });
-  await assert.rejects(() => call({ plane: 'fo', endpoint: '/x' }, basic.context));
-  assert.equal(m, 1, 'Basic auth has no token to refresh');
+  await assert.rejects(() => call({ plane: 'ot', endpoint: '/x' }, stubborn.context));
+  assert.equal(m, 2);
 });
 
 test('waits and retries a rate-limit rejection, once', async () => {
@@ -446,8 +457,8 @@ test('classifies rate-limit signals', () => {
 // -------------------------------------------------------------- error detail
 
 const explainCases = [
-  ['csam', 400, JSON.stringify({ responseMessage: 'Error validating customer from token - Invalid Subscription Id' }), /only accepts username\/password/],
-  ['fo', 401, '<SIMPLE_RETURN><RESPONSE><TEXT>Token has no access for the application.</TEXT></RESPONSE></SIMPLE_RETURN>', /does not accept username-derived tokens/],
+  ['csam', 400, JSON.stringify({ responseMessage: 'Error validating customer from token - Invalid Subscription Id' }), /still a work in progress/],
+  ['fo', 401, '<SIMPLE_RETURN><RESPONSE><TEXT>Token has no access for the application.</TEXT></RESPONSE></SIMPLE_RETURN>', /entitled to VMDR/],
   ['ot', 403, JSON.stringify({ message: 'forbidden' }), /App API Enabled/],
   ['csam', 416, JSON.stringify({ responseMessage: 'too big' }), /above the maximum/],
   ['csam', 400, JSON.stringify({ responseMessage: 'bad operator' }), /operator the field does not support/],
@@ -577,17 +588,21 @@ const runTest = async (data, script) => {
 
 const accepted = { statusCode: 200, body: 'header.payload.signature' };
 
-test('refuses a credential that carries no secret at all', async () => {
-  const { result, calls } = await runTest({ pod: 'eu2' }, () => accepted);
-
-  assert.equal(result.status, 'Error');
-  assert.match(result.message, /Enter an API client ID and secret/);
-  // Nothing is sent when there is nothing to test.
-  assert.equal(calls.length, 0);
+test('refuses a credential with no client', async () => {
+  for (const data of [{ pod: 'eu2' }, { pod: 'eu2', clientId: 'a' }, { pod: 'eu2', clientSecret: 'b' }]) {
+    const { result, calls } = await runTest(data, () => accepted);
+    assert.equal(result.status, 'Error');
+    assert.match(result.message, /Enter an API client ID and secret/);
+    // Nothing is sent when there is nothing to test.
+    assert.equal(calls.length, 0);
+  }
 });
 
 test('reports an unusable host before reaching the network', async () => {
-  const { result, calls } = await runTest({ pod: 'custom', baseUrl: '  ' }, () => accepted);
+  const { result, calls } = await runTest(
+    { pod: 'custom', baseUrl: '  ', clientId: 'a', clientSecret: 'b' },
+    () => accepted,
+  );
 
   assert.equal(result.status, 'Error');
   assert.match(result.message, /Base URL is required/);
@@ -601,53 +616,25 @@ test('tests the client against the endpoint its type selects', async () => {
   );
 
   assert.equal(result.status, 'OK');
+  assert.equal(calls.length, 1);
   assert.match(calls[0].uri, /\/auth\/oauth$/);
   assert.equal(calls[0].headers.clientId, 'a');
-  // A client cannot reach Asset Management, so the result says so.
-  assert.match(result.message, /need a username and password/);
+  // A working client still cannot read Asset Management, so the result says so.
+  assert.match(result.message, /until Qualys ships client-credential support/);
 });
 
-test('tests the username and password against the user token endpoint', async () => {
-  const { result, calls } = await runTest(
-    { pod: 'eu2', username: 'u', password: 'p' },
-    () => accepted,
-  );
-
-  assert.equal(result.status, 'OK');
-  assert.equal(result.message, 'Connection successful');
-  assert.match(calls[0].uri, /\/auth$/);
-  assert.match(String(calls[0].body), /username=u&password=p&token=true/);
-});
-
-test('tests both secrets and names the one that was rejected', async () => {
-  const { result, calls } = await runTest(
-    { pod: 'eu2', clientId: 'a', clientSecret: 'b', username: 'u', password: 'p' },
-    (options) =>
-      /\/auth\/oidc$/.test(options.uri)
-        ? { statusCode: 401, body: 'Bad client credentials' }
-        : accepted,
-  );
-
-  assert.equal(calls.length, 2);
-  // One secret working is still a usable credential.
-  assert.equal(result.status, 'OK');
-  assert.match(result.message, /API client was rejected \(Bad client credentials\)/);
-  assert.doesNotMatch(result.message, /need a username and password/);
-});
-
-test('fails when every secret is rejected', async () => {
-  const { result } = await runTest(
-    { pod: 'eu2', clientId: 'a', clientSecret: 'b', username: 'u', password: 'p' },
-    () => ({ statusCode: 401, body: '' }),
-  );
+test('fails when the client is rejected, quoting what Qualys said', async () => {
+  const { result } = await runTest({ pod: 'eu2', clientId: 'a', clientSecret: 'b' }, () => ({
+    statusCode: 401,
+    body: 'Client authentication failed: Invalid Client ID',
+  }));
 
   assert.equal(result.status, 'Error');
-  assert.match(result.message, /API client: HTTP 401/);
-  assert.match(result.message, /Username and password: HTTP 401/);
+  assert.match(result.message, /API client: Client authentication failed: Invalid Client ID/);
 });
 
 test('treats an accepted response with no token as a failure', async () => {
-  const { result } = await runTest({ pod: 'eu2', username: 'u', password: 'p' }, () => ({
+  const { result } = await runTest({ pod: 'eu2', clientId: 'a', clientSecret: 'b' }, () => ({
     statusCode: 200,
     body: '   ',
   }));
@@ -657,7 +644,7 @@ test('treats an accepted response with no token as a failure', async () => {
 });
 
 test('survives a transport-level throw and redacts what it reports', async () => {
-  const { result } = await runTest({ pod: 'eu2', username: 'u', password: 'p' }, () => {
+  const { result } = await runTest({ pod: 'eu2', clientId: 'a', clientSecret: 'b' }, () => {
     throw new Error('connect ETIMEDOUT, sent Authorization: Bearer abc.def.ghi');
   });
 
@@ -670,7 +657,6 @@ test('reports a rejection body with any JWT in it redacted', async () => {
   const leaky = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZSJ9.c2lnbmF0dXJl';
   const { result } = await runTest({ pod: 'eu2', clientId: 'a', clientSecret: 'b' }, () => ({
     statusCode: 400,
-    // Qualys has echoed a token back in an error body before now.
     body: `rejected for ref/9912 token=${leaky}`,
   }));
 
@@ -680,24 +666,15 @@ test('reports a rejection body with any JWT in it redacted', async () => {
   assert.match(result.message, /rejected for ref\/9912/);
 });
 
-test('tolerates a credential with no data at all', async () => {
-  const { context } = testContext(() => accepted);
-  const result = await testQualysCredential.call(context, {});
-
-  assert.equal(result.status, 'Error');
-});
-
 test('falls back when the request helper answers nothing usable', async () => {
-  // A helper that resolves to undefined, and a throw carrying no message: both
-  // must still produce a readable result rather than crashing the test button.
-  const { result: empty } = await runTest(
-    { pod: 'eu2', username: 'u', password: 'p' },
-    () => undefined,
-  );
+  const client = { pod: 'eu2', clientId: 'a', clientSecret: 'b' };
+
+  const { result: empty } = await runTest(client, () => undefined);
   assert.equal(empty.status, 'Error');
   assert.match(empty.message, /HTTP 0/);
 
-  const { result: silent } = await runTest({ pod: 'eu2', username: 'u', password: 'p' }, () => {
+  // An Error carrying no message must still produce something readable.
+  const { result: silent } = await runTest(client, () => {
     throw new Error('');
   });
   assert.equal(silent.status, 'Error');
@@ -710,17 +687,46 @@ test('reads a non-string body as an unusable response', async () => {
     body: { token: 'parsed-already' },
   }));
 
-  // The helper is asked for the raw body; an object means the shape changed, so
-  // it is reported rather than assumed good.
   assert.equal(result.status, 'Error');
   assert.match(result.message, /HTTP 200/);
+});
+
+test('tolerates a credential with no data at all', async () => {
+  const { context } = testContext(() => accepted);
+  const result = await testQualysCredential.call(context, {});
+
+  assert.equal(result.status, 'Error');
+});
+
+// --------------------------------------------------------- token endpoint edges
+
+test('falls back to the status code when an auth rejection says nothing', async () => {
+  clearTokenCache();
+  const bare = makeContext({
+    script: () => json({ ok: true }),
+    authResponse: { statusCode: 503, body: '' },
+  });
+  await assert.rejects(
+    () => call({ plane: 'ot', endpoint: '/ot/1.0/host/list' }, bare.context),
+    /HTTP 503/,
+  );
+
+  // An object body with no recognisable message field lands in the same place.
+  clearTokenCache();
+  const shapeless = makeContext({
+    script: () => json({ ok: true }),
+    authResponse: { statusCode: 500, body: { unexpected: true } },
+  });
+  await assert.rejects(
+    () => call({ plane: 'ot', endpoint: '/ot/1.0/host/list' }, shapeless.context),
+    /HTTP 500/,
+  );
 });
 
 test('surfaces the message from an object-bodied auth rejection', async () => {
   clearTokenCache();
   const { context } = makeContext({
     script: () => json({ ok: true }),
-    credentials: { pod: 'eu2', clientId: 'a', clientSecret: 'b' },
     // A helper that has already parsed the error body hands back an object.
     authResponse: { statusCode: 401, body: { message: 'Client is disabled' } },
   });
@@ -731,38 +737,10 @@ test('surfaces the message from an object-bodied auth rejection', async () => {
   );
 });
 
-test('falls back to the status code when an auth rejection says nothing', async () => {
-  clearTokenCache();
-  const bare = makeContext({
-    script: () => json({ ok: true }),
-    credentials: { pod: 'eu2', clientId: 'a', clientSecret: 'b' },
-    authResponse: { statusCode: 503, body: '' },
-  });
-
-  await assert.rejects(
-    () => call({ plane: 'ot', endpoint: '/ot/1.0/host/list' }, bare.context),
-    /HTTP 503/,
-  );
-
-  // An object body with no recognisable message field lands in the same place.
-  clearTokenCache();
-  const shapeless = makeContext({
-    script: () => json({ ok: true }),
-    credentials: { pod: 'eu2', clientId: 'a', clientSecret: 'b' },
-    authResponse: { statusCode: 500, body: { unexpected: true } },
-  });
-
-  await assert.rejects(
-    () => call({ plane: 'ot', endpoint: '/ot/1.0/host/list' }, shapeless.context),
-    /HTTP 500/,
-  );
-});
-
 test('rejects an auth response that carries no token at all', async () => {
   clearTokenCache();
   const { context } = makeContext({
     script: () => json({ ok: true }),
-    credentials: { pod: 'eu2', clientId: 'a', clientSecret: 'b' },
     authResponse: { statusCode: 200, body: '' },
   });
 

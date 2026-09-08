@@ -135,13 +135,13 @@ test('describes a failure with everything needed to identify it', () => {
     plane: 'csam',
     method: 'POST',
     endpoint: '/rest/2.0/search/am/asset',
-    mode: 'userToken',
+    mode: 'client',
     statusCode: 400,
     qualysCode: 'FAILED',
   });
   assert.match(full, /Request: POST \/rest\/2\.0\/search\/am\/asset/);
   assert.match(full, /API: CyberSecurity Asset Management/);
-  assert.match(full, /Authenticated with: username\/password token/);
+  assert.match(full, /Authenticated with: API client/);
   assert.match(full, /HTTP status: 400/);
   assert.match(full, /Qualys code: FAILED/);
 
@@ -153,7 +153,7 @@ test('describes a failure with everything needed to identify it', () => {
 
   // A zero status is a transport failure, not an HTTP one.
   assert.doesNotMatch(
-    describeFailure({ plane: 'fo', method: 'GET', endpoint: '/x', mode: 'basic', statusCode: 0 }),
+    describeFailure({ plane: 'fo', method: 'GET', endpoint: '/x', mode: 'client', statusCode: 0 }),
     /HTTP status/,
   );
 });
@@ -167,13 +167,10 @@ test('labels every plane and authentication mode', () => {
   ]) {
     assert.match(describeFailure({ plane, method: 'GET', endpoint: '/x', mode: 'client' }), new RegExp(label));
   }
-  for (const [mode, label] of [
-    ['client', 'API client'],
-    ['userToken', 'username/password token'],
-    ['basic', 'HTTP Basic'],
-  ]) {
-    assert.match(describeFailure({ plane: 'ot', method: 'GET', endpoint: '/x', mode }), new RegExp(label));
-  }
+  assert.match(
+    describeFailure({ plane: 'ot', method: 'GET', endpoint: '/x', mode: 'client' }),
+    /Authenticated with: API client/,
+  );
 });
 
 test('redacts a credential that somehow reached the endpoint', () => {
@@ -181,7 +178,7 @@ test('redacts a credential that somehow reached the endpoint', () => {
     plane: 'fo',
     method: 'GET',
     endpoint: '/api/5.0/fo/asset/host/?token=eyJhbGciOiJIUzI1NiJ9.eyJhIjoxfQ.sig',
-    mode: 'basic',
+    mode: 'client',
   });
   assert.ok(described.includes(REDACTED));
   assert.ok(!described.includes('eyJhbGciOiJIUzI1NiJ9'));
@@ -265,7 +262,6 @@ test('an HTTP failure keeps the response body and adds context', async () => {
   const body = { responseCode: 'FAILED', responseMessage: 'Invalid Subscription Id', count: 0 };
   const { context } = makeContext({
     params: listParams('listAssets', { count: 1, csamOptions: {} }),
-    credentials: { pod: 'eu2', username: 'u', password: 'p' },
     script: () => raw(400, JSON.stringify(body)),
   });
 
@@ -276,7 +272,7 @@ test('an HTTP failure keeps the response body and adds context', async () => {
     (error) => {
       // Qualys' own words are kept, and the hint is appended rather than replacing them.
       assert.match(error.message, /Invalid Subscription Id/);
-      assert.match(error.message, /only accepts username\/password/);
+      assert.match(error.message, /still a work in progress/);
       assert.equal(error.httpCode, '400');
       // The full response body is still available to branch on.
       assert.deepEqual(error.body, body);
