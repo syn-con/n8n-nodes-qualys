@@ -31,6 +31,24 @@ test('rejects an empty base URL', () => {
   assert.throws(() => buildBaseUrl(''), /Base URL is required/);
 });
 
+test('requires HTTPS, and assumes it for a bare host', () => {
+  assert.equal(buildBaseUrl('gateway.example.test'), 'https://gateway.example.test');
+  assert.equal(buildBaseUrl(' https://gateway.example.test/ '), 'https://gateway.example.test');
+  assert.equal(buildBaseUrl('HTTPS://gateway.example.test'), 'HTTPS://gateway.example.test');
+
+  // Refused rather than quietly upgraded, so a mistake stays visible.
+  for (const cleartext of [
+    'http://gateway.example.test',
+    'HTTP://gateway.example.test',
+    'ftp://gateway.example.test',
+  ]) {
+    assert.throws(() => buildBaseUrl(cleartext), /must use HTTPS/, `${cleartext} was accepted`);
+  }
+
+  // The derived platform host inherits the same rule.
+  assert.throws(() => derivePlatformUrl('http://gateway.qg1.apps.qualys.com'), /must use HTTPS/);
+});
+
 test('derives the platform host for every known pod', () => {
   for (const [pod, hosts] of Object.entries(POD_HOSTS)) {
     assert.equal(
@@ -325,14 +343,38 @@ test('serialises an object body as JSON and passes a string body through', async
   assert.equal(str.calls[0].headers['Content-Type'], undefined);
 });
 
-test('uses an absolute endpoint verbatim, as paging links require', async () => {
+test('follows a same-host paging link verbatim', async () => {
   clearTokenCache();
   const { context, calls } = makeContext({ script: () => raw(200, '<R/>') });
-  await call(
-    { plane: 'fo', endpoint: 'https://elsewhere.test/api/next?id_min=5', xml: true },
-    context,
-  );
-  assert.equal(calls[0].url, 'https://elsewhere.test/api/next?id_min=5');
+  const next = 'https://qualysapi.qg2.apps.qualys.eu/api/2.0/fo/asset/host/?id_min=5';
+
+  await call({ plane: 'fo', endpoint: next, xml: true }, context);
+
+  assert.equal(calls[0].url, next);
+  assert.match(calls[0].headers.Authorization, /^Bearer /);
+});
+
+test('refuses a paging link that points off the configured host', async () => {
+  // The platform API returns the next batch as a full URL in its WARNING
+  // element, so this value comes out of the response body. Following it
+  // anywhere would hand the bearer token to whoever named the host.
+  for (const hostile of [
+    'https://elsewhere.test/api/next?id_min=5',
+    'http://qualysapi.qg2.apps.qualys.eu/api/next',
+    'https://qualysapi.qg2.apps.qualys.eu.attacker.test/api/next',
+    'https://qualysapi.qg2.apps.qualys.eu:8443/api/next',
+  ]) {
+    clearTokenCache();
+    const { context, calls } = makeContext({ script: () => raw(200, '<R/>') });
+
+    await assert.rejects(
+      () => call({ plane: 'fo', endpoint: hostile, xml: true }, context),
+      /Refusing to follow a paging link/,
+      `${hostile} was followed`,
+    );
+    // The request is never made, so the token never leaves.
+    assert.equal(calls.length, 0);
+  }
 });
 
 test('parses JSON, falls back to text, and tolerates an empty body', async () => {
@@ -748,4 +790,29 @@ test('rejects an auth response that carries no token at all', async () => {
     () => call({ plane: 'ot', endpoint: '/ot/1.0/host/list' }, context),
     /returned no token/,
   );
+});
+
+test('never serves one credential the token cached for another', async () => {
+  // The cache is module scoped, so every credential in the process shares it,
+  // and the key is host|mode|clientId|fingerprint(secret). If the fingerprint
+  // collided, a caller who knew another tenant's client ID could be handed
+  // their token.
+  clearTokenCache();
+  const victim = makeContext({
+    script: () => json({ ok: true }),
+    credentials: { ...CREDENTIALS, clientId: 'shared-id', clientSecret: 'victim-secret' },
+    token: jwt({ sub: 'victim' }),
+  });
+  await call({ plane: 'ot', endpoint: '/x' }, victim.context);
+  const victimToken = victim.calls[0].headers.Authorization;
+
+  const attacker = makeContext({
+    script: () => json({ ok: true }),
+    credentials: { ...CREDENTIALS, clientId: 'shared-id', clientSecret: 'attacker-secret' },
+    token: jwt({ sub: 'attacker' }),
+  });
+  await call({ plane: 'ot', endpoint: '/x' }, attacker.context);
+
+  assert.notEqual(attacker.calls[0].headers.Authorization, victimToken);
+  assert.equal(attacker.authCalls.length, 1, 'a different secret must mint its own token');
 });

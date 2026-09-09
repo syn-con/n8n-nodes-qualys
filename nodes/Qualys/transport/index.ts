@@ -161,13 +161,33 @@ type Attempt = {
   forceRefresh: boolean;
 };
 
-/** A relative endpoint is resolved against the plane's host; a paging link is not. */
+/**
+ * A relative endpoint is resolved against the plane's host. An absolute one is
+ * a paging link, and paging links come out of the response body - the platform
+ * API hands back the next batch as a full URL in its WARNING element.
+ *
+ * Every request carries the bearer token, so following such a link to another
+ * origin would hand the subscription's token to whichever host the response
+ * named. The link is therefore only followed back to the host this credential
+ * was configured to talk to.
+ */
 function resolveUrl(endpoint: string, plane: QualysPlane, hosts: Hosts): string {
-  if (/^https?:\/\//i.test(endpoint)) {
-    return endpoint;
+  const base = plane === 'fo' ? hosts.platform : hosts.gateway;
+
+  if (!/^https?:\/\//i.test(endpoint)) {
+    return `${base}${endpoint}`;
   }
 
-  return `${plane === 'fo' ? hosts.platform : hosts.gateway}${endpoint}`;
+  const target = new URL(endpoint);
+  const expected = new URL(base);
+
+  if (target.origin.toLowerCase() !== expected.origin.toLowerCase()) {
+    throw new Error(
+      `Refusing to follow a paging link to ${target.origin}: it does not match the configured Qualys host ${expected.origin}. The credential's bearer token is only ever sent to that host.`,
+    );
+  }
+
+  return endpoint;
 }
 
 /** JSON bodies are serialised here so the Content-Type cannot drift from them. */

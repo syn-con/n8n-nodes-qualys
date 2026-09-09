@@ -54,7 +54,7 @@ export class QualysVmdrOtApi implements ICredentialType {
       type: 'string',
       default: 'https://gateway.qg1.apps.qualys.com',
       description:
-        'Gateway host, used for VMDR OT and IT Asset requests. Bare hosts are automatically prefixed with HTTPS.',
+        'Gateway host, used for VMDR OT and IT Asset requests. Must be HTTPS; a bare host is assumed to be. A cleartext URL is refused, because the client secret and the token minted from it travel on every request.',
       placeholder: 'https://gateway.qg1.apps.qualys.com',
       displayOptions: {
         show: {
@@ -68,7 +68,7 @@ export class QualysVmdrOtApi implements ICredentialType {
       type: 'string',
       default: '',
       description:
-        'The qualysapi host, used for VMDR vulnerability and KnowledgeBase requests. Leave empty to derive it from the gateway URL.',
+        'The qualysapi host, used for VMDR vulnerability and KnowledgeBase requests. Must be HTTPS. Leave empty to derive it from the gateway URL.',
       placeholder: 'https://qualysapi.qg1.apps.qualys.com',
       displayOptions: {
         show: {

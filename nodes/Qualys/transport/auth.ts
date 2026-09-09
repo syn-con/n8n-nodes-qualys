@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { IDataObject, IHttpRequestOptions } from 'n8n-workflow';
 
 import type { QualysCredential, QualysPlane, QualysRequestContext } from './types';
@@ -75,13 +77,18 @@ function cacheKey(baseUrl: string, mode: AuthMode, credentials: QualysCredential
   return `${baseUrl}|${mode}|${identity ?? ''}|${fingerprint(secret ?? '')}`;
 }
 
-/** Non-cryptographic; only needs to change when the secret changes. */
+/**
+ * Distinguishes one secret from another in the cache key without holding the
+ * secret itself.
+ *
+ * This has to be collision resistant, not merely fast. The cache is module
+ * scoped, so every credential in the n8n process shares it, and the rest of the
+ * key is guessable - host, mode and client ID. A 32-bit non-cryptographic hash
+ * would let someone who knows another tenant's client ID craft a secret that
+ * collides with theirs and be served their cached token.
+ */
 function fingerprint(value: string): string {
-  let hash = 5381;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = ((hash << 5) + hash + value.charCodeAt(index)) | 0;
-  }
-  return (hash >>> 0).toString(36);
+  return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
 /** Read `exp` out of a JWT without verifying it; the server is the authority. */

@@ -38,6 +38,16 @@ export const POD_HOSTS: Record<Exclude<QualysPod, 'custom'>, PodHosts> = {
   gov1: { gateway: 'gateway.gov1.qualys.us', platform: 'qualysapi.gov1.qualys.us' },
 };
 
+/**
+ * Normalise a credential's host into an absolute HTTPS base URL.
+ *
+ * HTTPS is mandatory. Every request carries the client's bearer token, and the
+ * token endpoint carries the client secret itself, so a cleartext base URL
+ * would put both on the wire - and would let anyone on the path rewrite the
+ * platform API's paging link to redirect the token elsewhere. A bare host is
+ * assumed to be HTTPS; any other scheme is refused rather than upgraded, so a
+ * mistake is visible instead of silently rewritten.
+ */
 export function buildBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim().replace(/\/+$/, '');
 
@@ -45,7 +55,15 @@ export function buildBaseUrl(baseUrl: string): string {
     throw new Error('Qualys API Gateway Base URL is required');
   }
 
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(trimmed);
+
+  if (scheme && scheme[1].toLowerCase() !== 'https') {
+    throw new Error(
+      `Qualys base URLs must use HTTPS, but got "${trimmed}". The client secret and the bearer token minted from it would otherwise cross the network in the clear.`,
+    );
+  }
+
+  return scheme ? trimmed : `https://${trimmed}`;
 }
 
 /**
