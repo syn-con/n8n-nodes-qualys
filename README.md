@@ -1,4 +1,4 @@
-# @syn-con/n8n-nodes-qualys
+# @synergyconsulting/n8n-nodes-qualys
 
 This is an n8n community node. It lets you use [Qualys](https://www.qualys.com/) in your n8n
 workflows.
