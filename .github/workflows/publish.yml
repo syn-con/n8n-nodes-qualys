@@ -13,7 +13,7 @@
 #   2. Under "Publish access" → "Trusted Publishers", click "Add a publisher".
 #   3. Select GitHub Actions and fill in:
 #        Repository owner: syn-con
-#        Repository name:  n8n-nodes-nksc-nivs
+#        Repository name:  n8n-nodes-qualys
 #        Workflow name:    publish.yml
 #        Environment:      (leave blank)
 #   4. Leave the NPM_TOKEN secret unset. GitHub's OIDC token is used instead.
@@ -60,7 +60,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: '24'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 

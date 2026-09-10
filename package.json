@@ -63,9 +63,9 @@
   "publishConfig": {
     "access": "public"
   },
-  "homepage": "https://github.com/syn-con/n8n-qualys#readme",
+  "homepage": "https://github.com/syn-con/n8n-nodes-qualys#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/syn-con/n8n-qualys.git"
+    "url": "https://github.com/syn-con/n8n-nodes-qualys.git"
   }
 }

@@ -399,11 +399,20 @@ The suite is entirely offline: `tests/support.cjs` stubs `n8n-workflow` and scri
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `ci.yml` | pull requests, pushes to `main` | typecheck, both lint passes, tests with the coverage gate |
-| `publish.yml` | pushes to `main` that change `package.json` | builds and publishes to GitHub Packages, then tags the release |
+| `publish.yml` | version tags (`2.1.0`, `2.2.0-rc.1`, …) | publishes to npm with a provenance attestation |
 
-`publish.yml` publishes to GitHub Packages, not the public npm registry. n8n discovers and
-verifies community nodes on npmjs.org, so publishing there is a prerequisite for listing this
-node in the n8n community catalogue.
+Releases are cut locally with `npm run release`, which lints, builds, prompts for the version
+bump, writes the changelog, commits, tags and pushes. **Pushing that tag is the only thing that
+publishes** — the workflow never bumps a version or creates a tag of its own.
+
+The trigger matches unprefixed tags (`2.1.0`), the shape `release-it` writes. Older tags in
+this repository are `v`-prefixed (`v2.0.8`) and will not fire it; to publish a version already
+in `package.json`, push the tag without the `v`.
+
+Provenance is what lets n8n verify the package, and npm only produces it when publishing from
+this workflow — `prepublishOnly` blocks a bare `npm publish` so a release cannot go out without
+it. Authentication is either npm Trusted Publishing via OIDC (no stored secret) or an
+`NPM_TOKEN` repository secret; `publish.yml` documents both.
 
 ## License
 

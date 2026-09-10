@@ -13,10 +13,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node 24 to match the npm that writes package-lock.json. npm 10 (Node 22)
+      # resolves @langchain/community's optional peer dependencies differently
+      # and rejects a lockfile npm 11 wrote, so `npm ci` fails on a lock that is
+      # actually in sync. `engines` still allows 20.15+ for consumers.
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
 
       # isolated-vm (pulled in by @n8n/node-cli) asks for Node >= 24 and needs a
