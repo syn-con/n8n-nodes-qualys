@@ -1,4 +1,10 @@
-import type { IDataObject, JsonObject } from 'n8n-workflow';
+import {
+  NodeApiError,
+  NodeOperationError,
+  type IDataObject,
+  type INode,
+  type JsonObject,
+} from 'n8n-workflow';
 
 import type { AuthMode } from './auth';
 import type { QualysPlane } from './types';
@@ -201,4 +207,28 @@ export function extractQualysCode(body: unknown): string | undefined {
   }
 
   return undefined;
+}
+
+/**
+ * Guarantee a caught value reaches n8n as a node error.
+ *
+ * An error raised further down is already a `NodeApiError` or
+ * `NodeOperationError` carrying the Qualys message and the diagnostic block, so
+ * it is passed through - re-wrapping would bury those. Anything else is a raw
+ * throw that would reach the UI without node context, so it is wrapped, with
+ * its payload sanitized first because n8n renders it into the execution data.
+ *
+ * Going through here rather than re-throwing the caught value directly is also
+ * what satisfies `require-node-api-error`: every throw is provably a node error.
+ */
+export function asNodeError(node: INode, error: unknown): NodeApiError | NodeOperationError {
+  if (error instanceof NodeApiError || error instanceof NodeOperationError) {
+    return error;
+  }
+
+  const message = (error as Error | undefined)?.message;
+
+  return new NodeApiError(node, sanitizeForError(error), {
+    message: message ? `Qualys request failed: ${message}` : 'Qualys request failed',
+  });
 }

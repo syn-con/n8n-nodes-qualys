@@ -18,7 +18,7 @@ import {
   type ResponseMetadata,
 } from './shared/records';
 import { OPERATIONS, type Operation } from './resources';
-import { qualysApiRequest } from '../transport';
+import { asNodeError, qualysApiRequest } from '../transport';
 
 // Re-exported so the filters, the pagers and the record shaping present one
 // surface. Anything only used inside this directory is imported, not re-exported.
@@ -105,9 +105,9 @@ export async function router(this: IExecuteFunctions): Promise<INodeExecutionDat
       }
 
       // Already a NodeApiError or NodeOperationError from the layer below, with
-      // its diagnostics attached; re-wrapping would bury them.
-      // eslint-disable-next-line @n8n/community-nodes/require-node-api-error
-      throw error;
+      // its diagnostics attached, so this passes it through rather than
+      // re-wrapping and burying them.
+      throw asNodeError(this.getNode(), error);
     }
   }
 

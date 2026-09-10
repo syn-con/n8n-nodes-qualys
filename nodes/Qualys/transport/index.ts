@@ -22,6 +22,7 @@ import type {
   QualysRequestContext,
 } from './types';
 import {
+  asNodeError,
   describeFailure,
   extractQualysCode,
   sanitizeForError,
@@ -42,6 +43,7 @@ export {
 export { findNextBatchUrl, parseQualysXml, pluck } from './xml';
 export {
   REDACTED,
+  asNodeError,
   describeFailure,
   extractQualysCode,
   redactSecretsInText,
@@ -150,18 +152,15 @@ export async function qualysApiRequest(
     assertSuccessfulResponse.call(this, response, failure);
     return finalizeBody(response, requestOptions.xml === true);
   } catch (error) {
-    if (error instanceof NodeApiError) {
-      // Raised by assertSuccessfulResponse, which has already attached the
-      // Qualys message and the diagnostic block.
-      // eslint-disable-next-line @n8n/community-nodes/require-node-api-error
-      throw error;
+    // Anything raised below is already a node error carrying the Qualys message
+    // and the diagnostic block. A transport failure (DNS, TLS, socket) is not:
+    // it arrives as an axios-shaped error carrying the outgoing request,
+    // including the Authorization header, so it is sanitized and wrapped with
+    // the failure's context before n8n renders it into the execution data.
+    if (error instanceof NodeApiError || error instanceof NodeOperationError) {
+      throw asNodeError(this.getNode(), error);
     }
 
-    // A transport failure (DNS, TLS, socket) arrives as an axios-shaped error
-    // carrying the outgoing request - including the Authorization header. It is
-    // sanitized before being handed on, because n8n renders this payload into
-    // the execution data. The message itself is preserved: dropping it left
-    // every failure showing as a bare "Qualys API error".
     const message = (error as Error | undefined)?.message;
 
     throw new NodeApiError(this.getNode(), sanitizeForError(error), {

@@ -28,29 +28,32 @@ const resourceProperty: INodeProperties = {
 /**
  * One dropdown per resource, naming the records that resource can read.
  *
- * `node-param-default-missing` reads defaults out of the syntax tree, so it
- * cannot see one computed per resource. The default is set below, and a test
- * asserts every dropdown defaults to an operation it actually offers - a
- * stronger check than the rule performs.
+ * Each defaults to the first operation its table declares. A test asserts every
+ * dropdown defaults to an operation it actually offers - a stronger check than
+ * `node-param-default-missing` can perform, since that rule reads defaults out
+ * of the syntax tree and cannot evaluate one computed per resource.
  */
 const operationProperties: INodeProperties[] = Object.entries(RESOURCES).map(
-  // eslint-disable-next-line n8n-nodes-base/node-param-default-missing
-  ([resource, definition]) => ({
-    displayName: 'Operation',
-    name: 'operation',
-    type: 'options',
-    noDataExpression: true,
-    options: byName(
-      Object.entries(definition.operations).map(([value, operation]) => ({
-        name: operation.name,
-        value,
-        description: operation.description,
-        action: operation.action,
-      })),
-    ),
-    default: Object.keys(definition.operations)[0],
-    displayOptions: { show: { resource: [resource] } },
-  }),
+  ([resource, definition]) => {
+    const [firstOperation] = Object.keys(definition.operations);
+
+    return {
+      displayName: 'Operation',
+      name: 'operation',
+      type: 'options',
+      noDataExpression: true,
+      options: byName(
+        Object.entries(definition.operations).map(([value, operation]) => ({
+          name: operation.name,
+          value,
+          description: operation.description,
+          action: operation.action,
+        })),
+      ),
+      default: firstOperation,
+      displayOptions: { show: { resource: [resource] } },
+    };
+  },
 );
 
 // ------------------------------------------------------------ shared paging UI
