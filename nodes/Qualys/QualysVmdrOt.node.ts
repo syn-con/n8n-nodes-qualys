@@ -1,5 +1,4 @@
 import type {
-  ICredentialTestFunction,
   IExecuteFunctions,
   INodeExecutionData,
   INodeType,
@@ -9,7 +8,6 @@ import type {
 
 import { properties } from './actions/description';
 import { router } from './actions/router';
-import { testQualysCredential } from './transport/credentialTest';
 
 /**
  * n8n-workflow 2.x turned `NodeConnectionType` into a type and moved the runtime
@@ -39,16 +37,9 @@ export class QualysVmdrOt implements INodeType {
       {
         name: 'qualysVmdrOtApi',
         required: true,
-        testedBy: 'qualysApiTest',
       },
     ],
     properties,
-  };
-
-  methods = {
-    credentialTest: {
-      qualysApiTest: testQualysCredential as ICredentialTestFunction,
-    },
   };
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {

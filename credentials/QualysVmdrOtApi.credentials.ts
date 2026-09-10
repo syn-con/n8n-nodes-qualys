@@ -1,4 +1,30 @@
-import type { Icon, ICredentialType, INodeProperties } from 'n8n-workflow';
+import type {
+  Icon,
+  ICredentialTestRequest,
+  ICredentialType,
+  INodeProperties,
+} from 'n8n-workflow';
+
+import { POD_HOSTS } from '../nodes/Qualys/transport/hosts';
+
+/** `pod` -> gateway host, inlined into the credential test's URL expression. */
+const GATEWAY_BY_POD = JSON.stringify(
+  Object.fromEntries(Object.entries(POD_HOSTS).map(([pod, hosts]) => [pod, hosts.gateway])),
+);
+
+/**
+ * Which gateway to authenticate against, as an n8n expression.
+ *
+ * A pod selects a known host; Custom takes the URL as typed and defaults to
+ * HTTPS, the same way the transport resolves it. Built from `POD_HOSTS` rather
+ * than written out, so the test cannot drift from the hosts the node uses.
+ */
+const GATEWAY_URL =
+  "={{ $credentials.pod === 'custom'" +
+  " ? ($credentials.baseUrl.startsWith('http')" +
+  " ? $credentials.baseUrl" +
+  " : 'https://' + $credentials.baseUrl)" +
+  ` : 'https://' + (${GATEWAY_BY_POD})[$credentials.pod] }}`;
 
 /**
  * One API client authenticates every request. There is no username/password and
@@ -20,6 +46,25 @@ export class QualysVmdrOtApi implements ICredentialType {
   displayName = 'Qualys API';
 
   documentationUrl = 'https://docs.qualys.com/en/csam/api/get_started/API_Authentication.htm';
+
+  /**
+   * Mints a token exactly as the transport does, so a wrong client type or a
+   * bad secret shows up as `Invalid Client ID` in the credential dialog rather
+   * than on the first workflow run.
+   */
+  test: ICredentialTestRequest = {
+    request: {
+      baseURL: GATEWAY_URL,
+      url: "={{ $credentials.clientGrant === 'oauth' ? '/auth/oauth' : '/auth/oidc' }}",
+      method: 'POST',
+      headers: {
+        clientId: '={{ $credentials.clientId }}',
+        clientSecret: '={{ $credentials.clientSecret }}',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: '',
+    },
+  };
 
   properties: INodeProperties[] = [
     {
