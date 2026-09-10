@@ -15,7 +15,7 @@ import type { Icon, ICredentialType, INodeProperties } from 'n8n-workflow';
 export class QualysVmdrOtApi implements ICredentialType {
   name = 'qualysVmdrOtApi';
 
-  icon?: Icon = { light: 'file:qualys.svg', dark: 'file:qualys.dark.svg' };
+  icon?: Icon = { light: 'file:../icons/qualys.svg', dark: 'file:../icons/qualys.dark.svg' };
 
   displayName = 'Qualys API';
 

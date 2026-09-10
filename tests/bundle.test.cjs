@@ -93,11 +93,29 @@ test('the codex ships beside the compiled node, naming this package', () => {
   assert.equal(codex.node, `${pkg.name}.qualysVmdrOt`);
 });
 
-test('icons ship beside the compiled node and credential', () => {
-  for (const entry of BUNDLED_ENTRIES) {
+test('every declared icon resolves to a file that shipped', () => {
+  // n8n resolves a `file:` icon against the directory of the class that
+  // declares it, so the assertion follows the same path the loader will.
+  const declared = [
+    [pkg.n8n.nodes[0], new (require(path.join(root, pkg.n8n.nodes[0]))).QualysVmdrOt().description.icon],
+    [
+      pkg.n8n.credentials[0],
+      new (require(path.join(root, pkg.n8n.credentials[0]))).QualysVmdrOtApi().icon,
+    ],
+  ];
+
+  for (const [entry, icon] of declared) {
+    assert.ok(icon, `${entry} declares no icon`);
     const dir = path.dirname(path.join(root, entry));
-    for (const icon of ['qualys.svg', 'qualys.dark.svg']) {
-      assert.ok(existsSync(path.join(dir, icon)), `${icon} is missing next to ${entry}`);
+
+    for (const theme of ['light', 'dark']) {
+      const declaredPath = icon[theme];
+      assert.ok(declaredPath?.startsWith('file:'), `${entry} ${theme} icon must use file:`);
+
+      const resolved = path.resolve(dir, declaredPath.slice('file:'.length));
+      assert.ok(existsSync(resolved), `${entry} ${theme} icon is missing from the build: ${resolved}`);
     }
+
+    assert.notEqual(icon.light, icon.dark, `${entry} uses the same file for both themes`);
   }
 });

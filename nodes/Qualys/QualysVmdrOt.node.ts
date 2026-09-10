@@ -24,7 +24,7 @@ export class QualysVmdrOt implements INodeType {
     displayName: 'Qualys',
     name: 'qualysVmdrOt',
     group: ['transform'],
-    icon: { light: 'file:qualys.svg', dark: 'file:qualys.dark.svg' },
+    icon: { light: 'file:../../icons/qualys.svg', dark: 'file:../../icons/qualys.dark.svg' },
     version: 1,
     subtitle: '={{ $parameter["resource"] + ": " + $parameter["operation"] }}',
     description:
