@@ -1,5 +1,10 @@
 # @synergyconsulting/n8n-nodes-qualys
 
+[![NPM Version](https://img.shields.io/npm/v/@synergyconsulting/n8n-nodes-qualys?style=flat-square)](https://www.npmjs.com/package/@synergyconsulting/n8n-nodes-qualys)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+
+
+
 This is an n8n community node. It lets you use [Qualys](https://www.qualys.com/) in your n8n
 workflows.
 
