@@ -83,8 +83,13 @@ jobs:
 
       - name: Publish
         # Publishes to npm with a provenance attestation (requires id-token: write
-        # above). `prepublishOnly` runs the build, so dist/ is produced here rather
-        # than committed. --access public is required for a scoped package.
+        # above). --access public is required for a scoped package's first publish.
+        #
+        # `prepublishOnly` is `n8n-node prerelease`, a guard that refuses a bare
+        # `npm publish` so a release cannot skip this workflow. It exits 1 unless
+        # RELEASE_MODE is set, which is how `n8n-node release` invokes publish, so
+        # this workflow has to set it too. It builds nothing: dist/ comes from the
+        # Test step above, which runs the build.
         #
         # Option A (OIDC): leave NPM_TOKEN unset — npm uses the OIDC exchange.
         # Option B (token): set NPM_TOKEN in repo secrets; setup-node's .npmrc
@@ -92,3 +97,4 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_MODE: 'true'
