@@ -1,5 +1,5 @@
 {
-  "node": "@syn-con/n8n-nodes-qualys.qualysVmdrOt",
+  "node": "@synergyconsulting/n8n-nodes-qualys.qualysVmdrOt",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
   "categories": ["Security", "Utility"],

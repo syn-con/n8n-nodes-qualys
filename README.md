@@ -25,12 +25,12 @@ workflow automation platform.
 ## Installation
 
 Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/)
-in the n8n community nodes documentation, using the package name `@syn-con/n8n-nodes-qualys`.
+in the n8n community nodes documentation, using the package name `@synergyconsulting/n8n-nodes-qualys`.
 
 To install it manually into a self-hosted instance:
 
 ```bash
-cd ~/.n8n/custom && npm install @syn-con/n8n-nodes-qualys
+cd ~/.n8n/custom && npm install @synergyconsulting/n8n-nodes-qualys
 ```
 
 ## Operations
