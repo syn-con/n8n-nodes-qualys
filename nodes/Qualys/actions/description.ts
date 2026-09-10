@@ -1,9 +1,9 @@
 import type { INodeProperties } from 'n8n-workflow';
 
-import { COUNT_OPS, LIST_OPS } from './operationScopes';
-import { csamProperties } from './parameters/csam';
-import { otFilterProperties } from './parameters/ot';
-import { foProperties } from './parameters/platform';
+import { COUNT_OPS, LIST_OPS } from './shared/operationScopes';
+import { csamProperties } from './planes/csam/parameters';
+import { otFilterProperties } from './planes/ot/parameters';
+import { foProperties } from './planes/fo/parameters';
 import { RESOURCES } from './resources';
 
 /** n8n's linter wants dropdown entries in alphabetical order. */
@@ -81,15 +81,6 @@ const pagingProperties: INodeProperties[] = [
     typeOptions: { minValue: 0, numberPrecision: 0 },
     description: 'Maximum records to return. Ignored when List All is enabled.',
     displayOptions: { show: { operation: LIST_OPS, listAll: [false] } },
-  },
-  {
-    displayName: 'Skip',
-    name: 'skip',
-    type: 'number',
-    default: 0,
-    typeOptions: { minValue: 0, numberPrecision: 0 },
-    description: 'Number of leading records to discard',
-    displayOptions: { show: { operation: LIST_OPS } },
   },
 ];
 

@@ -1,6 +1,6 @@
 import type { INodeProperties } from 'n8n-workflow';
 
-import { COMPONENT_OPS, CRITERIA_OPS, CSAM_OPS, GET_OPS } from '../operationScopes';
+import { COMPONENT_OPS, CRITERIA_OPS, CSAM_OPS, GET_OPS } from '../../shared/operationScopes';
 
 /**
  * CyberSecurity Asset Management parameters. This plane filters with a

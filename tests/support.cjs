@@ -126,7 +126,7 @@ const json = (body, headers = {}) => ({
 
 const raw = (statusCode, body, headers = {}) => ({ statusCode, headers, body });
 
-const { OPERATIONS } = require('../dist/nodes/Qualys/actions/resources');
+const { OPERATIONS } = require('../.test-build/nodes/Qualys/actions/resources');
 
 /**
  * Node parameters for one operation. Operation values are unique across
@@ -146,7 +146,6 @@ const listParams = (operation, extra = {}) => ({
   outputMode: 'items',
   includeMetadata: false,
   listAll: false,
-  skip: 0,
   count: 100,
   truncationLimit: 100,
   ...extra,

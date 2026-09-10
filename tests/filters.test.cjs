@@ -9,10 +9,13 @@ const {
   buildFilterExpression,
   buildFoParameters,
   buildSortExpression,
-  getCollectionEntries,
   resolveSortField,
   validateFoParameters,
-} = require('../dist/nodes/Qualys/actions/filters');
+} = require('../.test-build/nodes/Qualys/actions/planes');
+
+const {
+  getCollectionEntries,
+} = require('../.test-build/nodes/Qualys/actions/shared/collections');
 
 const {
   extractRecords,
@@ -22,7 +25,7 @@ const {
   formatCsamDate,
   buildCsamQuery,
   buildOtQuery,
-} = require('../dist/nodes/Qualys/actions/router');
+} = require('../.test-build/nodes/Qualys/actions/router');
 
 // ------------------------------------------------------- collection unwrapping
 
@@ -259,11 +262,10 @@ test('flattens detections defensively', () => {
   assert.deepEqual(flattenDetections([]), []);
 });
 
-test('windows a page by skip and count', () => {
-  assert.deepEqual(takeRecordsFromPage([], 0, 5), { records: [], nextSkip: 0, nextCount: 5 });
-  assert.deepEqual(takeRecordsFromPage(['a'], 0, Number.POSITIVE_INFINITY), {
+test('windows a page by the remaining count', () => {
+  assert.deepEqual(takeRecordsFromPage([], 5), { records: [], nextCount: 5 });
+  assert.deepEqual(takeRecordsFromPage(['a'], Number.POSITIVE_INFINITY), {
     records: ['a'],
-    nextSkip: 0,
     nextCount: Number.POSITIVE_INFINITY,
   });
 });

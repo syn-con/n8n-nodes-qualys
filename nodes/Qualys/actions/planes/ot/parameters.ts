@@ -1,6 +1,6 @@
 import type { INodeProperties } from 'n8n-workflow';
 
-import { QQL_OPS } from '../operationScopes';
+import { QQL_OPS } from '../../shared/operationScopes';
 
 /** VMDR OT parameters. This plane filters with QQL and is the only one that sorts. */
 export const otFilterProperties: INodeProperties[] = [

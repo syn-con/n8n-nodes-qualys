@@ -5,8 +5,8 @@ import {
   type INodeExecutionData,
 } from 'n8n-workflow';
 
-import type { QualysItemGranularity, QualysOperationKind, QualysOutputMode } from './node.type';
-import { buildCsamBody, clampCsamPageSize, createPager, type PagedRequest } from './pagers';
+import type { QualysItemGranularity, QualysOperationKind, QualysOutputMode } from './types';
+import { buildCsamBody, clampCsamPageSize, createPager, type PagedRequest } from './planes';
 import {
   buildMetadata,
   extractRecords,
@@ -16,7 +16,7 @@ import {
   takeRecordsFromPage,
   type ItemMetadata,
   type ResponseMetadata,
-} from './records';
+} from './shared/records';
 import { OPERATIONS, type Operation } from './resources';
 import { qualysApiRequest } from '../transport';
 
@@ -29,19 +29,19 @@ export {
   buildFoParameters,
   buildSortExpression,
   validateFoParameters,
-} from './filters';
+} from './planes';
 export {
   buildCsamQuery,
   buildOtQuery,
   clampCsamPageSize,
   formatCsamDate,
-} from './pagers';
+} from './planes';
 export {
   extractRecords,
   flattenDetections,
   resolveRecordLimit,
   takeRecordsFromPage,
-} from './records';
+} from './shared/records';
 
 /**
  * Backstop against a pager that never terminates. The subscription rate limit
@@ -94,7 +94,6 @@ export async function router(this: IExecuteFunctions): Promise<INodeExecutionDat
     try {
       // Sequential by design: a pager cannot build its next request until the
       // current response comes back, and Qualys throttles hard on concurrency.
-      // eslint-disable-next-line no-await-in-loop
       returnData.push(...(await EXECUTORS[definition.kind].call(this, definition, itemIndex)));
     } catch (error) {
       if (this.continueOnFail()) {
@@ -145,7 +144,6 @@ async function executeList(
 ): Promise<INodeExecutionData[]> {
   const listAll = this.getNodeParameter('listAll', itemIndex, false) as boolean;
   const count = Math.max(0, Number(this.getNodeParameter('count', itemIndex, 100)));
-  const skip = Math.max(0, Number(this.getNodeParameter('skip', itemIndex, 0)));
   const limit = resolveRecordLimit(count, listAll);
 
   if (limit === null) {
@@ -164,7 +162,6 @@ async function executeList(
   let pagesFetched = 0;
   let knownTotal: number | undefined;
   let latestMetadata: ResponseMetadata | undefined;
-  let remainingSkip = skip;
   let remainingCount = limit;
 
   const pager = createPager.call(this, definition, itemIndex);
@@ -193,7 +190,6 @@ async function executeList(
     }
 
     // Sequential by design: see the note in `router`.
-    // eslint-disable-next-line no-await-in-loop
     const response = await qualysApiRequest.call(this, request);
     pagesFetched += 1;
 
@@ -214,8 +210,7 @@ async function executeList(
     const pageRecords = extractRecords(body, definition.recordPath, definition.keyedRecords);
     const expanded = expandRecords.call(this, definition, pageRecords, itemIndex);
 
-    const window = takeRecordsFromPage(expanded, remainingSkip, remainingCount);
-    remainingSkip = window.nextSkip;
+    const window = takeRecordsFromPage(expanded, remainingCount);
     remainingCount = window.nextCount;
 
     if (outputMode === 'raw') {

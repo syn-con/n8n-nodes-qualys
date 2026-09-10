@@ -1,4 +1,10 @@
-import { NodeApiError, sleep, type IDataObject, type IHttpRequestOptions } from 'n8n-workflow';
+import {
+  NodeApiError,
+  NodeOperationError,
+  sleep,
+  type IDataObject,
+  type IHttpRequestOptions,
+} from 'n8n-workflow';
 
 import {
   describeMissingAuth,
@@ -85,14 +91,29 @@ export async function qualysApiRequest(
   const credentials = (await this.getCredentials(CREDENTIAL_NAME)) as QualysCredential | undefined;
 
   if (!credentials) {
-    throw new Error('No Qualys credentials were returned');
+    throw new NodeOperationError(this.getNode(), 'No Qualys credentials were returned', {
+      description: 'Select a Qualys API credential on this node.',
+    });
   }
 
-  const hosts = resolveHosts(credentials);
+  // These run before the request is attempted, so they are configuration
+  // problems rather than API failures - and they sit outside the try below,
+  // which only wraps transport errors.
+  let hosts: Hosts;
+  try {
+    hosts = resolveHosts(credentials);
+  } catch (error) {
+    throw new NodeOperationError(this.getNode(), (error as Error).message, {
+      description: 'Check the platform and base URLs on the Qualys credential.',
+    });
+  }
+
   const mode = selectAuthMode(credentials, requestOptions.plane);
 
   if (!mode) {
-    throw new Error(describeMissingAuth(requestOptions.plane));
+    throw new NodeOperationError(this.getNode(), describeMissingAuth(requestOptions.plane), {
+      description: 'Add an API client ID and secret to the Qualys credential.',
+    });
   }
 
   const failure: FailureContext = {
@@ -186,6 +207,7 @@ function resolveUrl(endpoint: string, plane: QualysPlane, hosts: Hosts): string 
       `Refusing to follow a paging link to ${target.origin}: it does not match the configured Qualys host ${expected.origin}. The credential's bearer token is only ever sent to that host.`,
     );
   }
+
 
   return endpoint;
 }

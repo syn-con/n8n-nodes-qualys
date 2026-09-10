@@ -1,7 +1,7 @@
 import type { IDataObject } from 'n8n-workflow';
 
-import type { QualysResource } from './node.type';
-import { pluck, type QualysApiResponse } from '../transport';
+import type { QualysResource } from '../types';
+import { pluck, type QualysApiResponse } from '../../transport';
 
 type RateLimitMetadata = {
   remaining?: number;
@@ -140,26 +140,23 @@ export function resolveRecordLimit(count: number, listAll: boolean): number | nu
   return normalizedCount === 0 ? null : normalizedCount;
 }
 
+/**
+ * Take as much of a page as the remaining budget allows, and report what is
+ * left. `List All` sets the budget to Infinity, which takes every page whole.
+ */
 export function takeRecordsFromPage(
   pageRecords: unknown[],
-  skipRemaining: number,
   countRemaining: number,
-): { records: unknown[]; nextSkip: number; nextCount: number } {
-  const startIndex = Math.min(skipRemaining, pageRecords.length);
-  const nextSkip = Math.max(0, skipRemaining - pageRecords.length);
-  const available = pageRecords.slice(startIndex);
-  const takeCount =
-    countRemaining === Number.POSITIVE_INFINITY
-      ? available.length
-      : Math.min(available.length, countRemaining);
+): { records: unknown[]; nextCount: number } {
+  if (countRemaining === Number.POSITIVE_INFINITY) {
+    return { records: pageRecords, nextCount: Number.POSITIVE_INFINITY };
+  }
+
+  const takeCount = Math.min(pageRecords.length, countRemaining);
 
   return {
-    records: available.slice(0, takeCount),
-    nextSkip,
-    nextCount:
-      countRemaining === Number.POSITIVE_INFINITY
-        ? Number.POSITIVE_INFINITY
-        : Math.max(0, countRemaining - takeCount),
+    records: pageRecords.slice(0, takeCount),
+    nextCount: Math.max(0, countRemaining - takeCount),
   };
 }
 

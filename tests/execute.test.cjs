@@ -3,8 +3,8 @@ const test = require('node:test');
 
 const { makeContext, json, raw, params, listParams } = require('./support.cjs');
 
-const { QualysVmdrOt } = require('../dist/nodes/Qualys/QualysVmdrOt.node');
-const { clearTokenCache } = require('../dist/nodes/Qualys/transport');
+const { QualysVmdrOt } = require('../.test-build/nodes/Qualys/QualysVmdrOt.node');
+const { clearTokenCache } = require('../.test-build/nodes/Qualys/transport');
 
 /** Run the node the way n8n does, through the class rather than the router. */
 async function execute(options) {
@@ -450,15 +450,15 @@ test('wraps a scalar record so it still has a JSON shape', async () => {
   assert.deepEqual(items.map((i) => i.json.value), ['first', 'second']);
 });
 
-test('applies skip and count across page boundaries', async () => {
+test('stops at Count part-way through a page', async () => {
   const { items } = await execute({
-    params: listParams('listHostAssets', { count: 3, skip: 99 }),
+    params: listParams('listHostAssets', { count: 3 }),
     script: (options) =>
       json({
         assets: Array.from({ length: 100 }, (_, i) => ({ assetId: options.qs.pageNumber * 100 + i })),
       }),
   });
-  assert.deepEqual(items.map((i) => i.json.assetId), [99, 100, 101]);
+  assert.deepEqual(items.map((i) => i.json.assetId), [0, 1, 2]);
 });
 
 // -------------------------------------------------------- per-item execution

@@ -10,3 +10,6 @@ yarn.lock
 
 # misc
 stuff
+
+# unbundled build the test suite runs against; never published
+.test-build

@@ -1,6 +1,6 @@
 import type { INodeProperties } from 'n8n-workflow';
 
-import { TRUNCATABLE_OPS, usingOptions } from '../operationScopes';
+import { TRUNCATABLE_OPS, usingOptions } from '../../shared/operationScopes';
 
 /**
  * Platform API (qualysapi) parameters. This plane takes Qualys' documented named

@@ -1,10 +1,8 @@
 {
-  "node": "n8n-nodes-base.qualysVmdrOt",
+  "node": "@syn-con/n8n-nodes-qualys.qualysVmdrOt",
   "nodeVersion": "1.0",
-  "codexVersion": "0.1",
-  "categories": [
-    "Security"
-  ],
+  "codexVersion": "1.0",
+  "categories": ["Security", "Utility"],
   "resources": {
     "credentialDocumentation": [
       {

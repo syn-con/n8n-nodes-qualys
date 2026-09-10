@@ -1,4 +1,4 @@
-import { operationsWhere } from './resources';
+import { operationsWhere } from '../resources';
 
 /**
  * Which operations each block of parameters belongs to.

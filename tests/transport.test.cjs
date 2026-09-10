@@ -20,7 +20,7 @@ const {
   pluck,
   isRateLimited,
   rateLimitWaitMs,
-} = require('../dist/nodes/Qualys/transport');
+} = require('../.test-build/nodes/Qualys/transport');
 
 const call = (options, ctx) => qualysApiRequest.call(ctx, options);
 
@@ -601,7 +601,7 @@ test('finds a next-batch URL wherever it is nested, and ignores blanks', () => {
 
 const {
   testQualysCredential,
-} = require('../dist/nodes/Qualys/transport/credentialTest');
+} = require('../.test-build/nodes/Qualys/transport/credentialTest');
 
 /**
  * The credential-test context is not the execute context: n8n hands it only a

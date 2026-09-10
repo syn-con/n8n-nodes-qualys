@@ -1,0 +1,11 @@
+This package bundles third-party software into its published `dist` artifact.
+
+--------------------------------------------------------------------------------
+fast-xml-parser (https://github.com/NaturalIntelligence/fast-xml-parser)
+Copyright (c) 2017 Amit Kumar Gupta
+Licensed under the MIT License.
+--------------------------------------------------------------------------------
+
+Bundling is required because n8n community nodes may not declare runtime
+dependencies. The Qualys platform API answers only in XML, so an XML parser is
+not optional for this node.

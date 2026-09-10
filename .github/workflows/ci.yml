@@ -21,15 +21,24 @@ jobs:
 
       # isolated-vm (pulled in by @n8n/node-cli) asks for Node >= 24 and needs a
       # native toolchain. It is only used by the n8n runtime the dev server
-      # downloads, so CI does not need it built.
+      # downloads, so CI does not need it built. esbuild is unaffected: it
+      # resolves its binary from the @esbuild/<platform> package, which npm
+      # installs without running scripts.
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
       - name: Type check
         run: npm run typecheck
 
+      # The verification-equivalent check: strict mode plus the stock n8n
+      # ruleset, with no local overrides.
       - name: Lint
         run: npm run lint
 
+      - name: Lint (house rules)
+        run: npm run lint:house
+
+      # Builds the bundle, then the unbundled tree the suite runs against.
+      # tests/bundle.test.cjs asserts the published artifact is self-contained.
       - name: Test with coverage
         run: npm run test:coverage

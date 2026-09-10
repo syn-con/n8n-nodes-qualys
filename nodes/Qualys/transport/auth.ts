@@ -49,7 +49,12 @@ export function clientGrant(credentials: QualysCredential): 'oidc' | 'oauth' {
     : 'oidc';
 }
 
-export function isConfigured(credentials: QualysCredential, _mode: AuthMode): boolean {
+/**
+ * Whether the credential can satisfy an auth mode. There is only one mode, so
+ * this is the same question as "is there a client", but the modes are kept
+ * distinct in `PLANE_AUTH_ORDER` for when a second one returns.
+ */
+export function isConfigured(credentials: QualysCredential): boolean {
   return hasClient(credentials);
 }
 
@@ -57,7 +62,7 @@ export function selectAuthMode(
   credentials: QualysCredential,
   plane: QualysPlane,
 ): AuthMode | undefined {
-  return PLANE_AUTH_ORDER[plane].find((mode) => isConfigured(credentials, mode));
+  return PLANE_AUTH_ORDER[plane].find(() => isConfigured(credentials));
 }
 
 export function describeMissingAuth(plane: QualysPlane): string {

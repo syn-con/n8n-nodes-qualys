@@ -3,7 +3,7 @@ const test = require('node:test');
 
 const { makeContext, listParams, raw } = require('./support.cjs');
 
-const { QualysVmdrOt } = require('../dist/nodes/Qualys/QualysVmdrOt.node');
+const { QualysVmdrOt } = require('../.test-build/nodes/Qualys/QualysVmdrOt.node');
 const {
   clearTokenCache,
   describeFailure,
@@ -11,7 +11,7 @@ const {
   redactSecretsInText,
   sanitizeForError,
   REDACTED,
-} = require('../dist/nodes/Qualys/transport');
+} = require('../.test-build/nodes/Qualys/transport');
 
 /** Serialise the way n8n does when it persists execution data. */
 function render(value) {

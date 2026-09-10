@@ -15,13 +15,13 @@ Module._load = function patchedLoad(request, parent, isMain) {
   return originalLoad.call(this, request, parent, isMain);
 };
 
-const { QualysVmdrOtApi } = require('../dist/credentials/QualysVmdrOtApi.credentials');
+const { QualysVmdrOtApi } = require('../.test-build/credentials/QualysVmdrOtApi.credentials');
 const {
   QualysVmdrOt: QualysNodeClass,
-} = require('../dist/nodes/Qualys/QualysVmdrOt.node');
+} = require('../.test-build/nodes/Qualys/QualysVmdrOt.node');
 
 const description = new QualysNodeClass().description;
-const { OPERATIONS, RESOURCES } = require('../dist/nodes/Qualys/actions/resources');
+const { OPERATIONS, RESOURCES } = require('../.test-build/nodes/Qualys/actions/resources');
 const {
   buildBaseUrl,
   derivePlatformUrl,
@@ -34,7 +34,7 @@ const {
   readJwtExpiry,
   isRateLimited,
   rateLimitWaitMs,
-} = require('../dist/nodes/Qualys/transport');
+} = require('../.test-build/nodes/Qualys/transport');
 const {
   buildComponentFilter,
   buildCsamFilter,
@@ -51,7 +51,7 @@ const {
   resolveRecordLimit,
   takeRecordsFromPage,
   validateFoParameters,
-} = require('../dist/nodes/Qualys/actions/router');
+} = require('../.test-build/nodes/Qualys/actions/router');
 
 const propertyByName = (name) => description.properties.find((property) => property.name === name);
 
@@ -573,17 +573,18 @@ test('resolves list all and count limits', () => {
   assert.equal(resolveRecordLimit(Number.NaN, true), Number.POSITIVE_INFINITY);
 });
 
-test('takes records from a page with skip and count', () => {
-  assert.deepEqual(takeRecordsFromPage(['a', 'b', 'c', 'd'], 1, 2), {
-    records: ['b', 'c'],
-    nextSkip: 0,
+test('takes records from a page up to the remaining count', () => {
+  assert.deepEqual(takeRecordsFromPage(['a', 'b', 'c', 'd'], 2), {
+    records: ['a', 'b'],
     nextCount: 0,
   });
-  assert.deepEqual(takeRecordsFromPage(['a', 'b'], 5, Number.POSITIVE_INFINITY), {
-    records: [],
-    nextSkip: 3,
+  // List All: every page is taken whole and the budget never runs down.
+  assert.deepEqual(takeRecordsFromPage(['a', 'b'], Number.POSITIVE_INFINITY), {
+    records: ['a', 'b'],
     nextCount: Number.POSITIVE_INFINITY,
   });
+  // A page larger than the budget is truncated, not dropped.
+  assert.deepEqual(takeRecordsFromPage(['a', 'b', 'c'], 1), { records: ['a'], nextCount: 0 });
 });
 
 // ------------------------------------------------------------- node metadata
@@ -634,7 +635,7 @@ test('describes the node and its resource menu', () => {
   assert.equal(description.displayName, 'Qualys');
   assert.equal(description.name, 'qualysVmdrOt');
   assert.equal(description.credentials[0].name, 'qualysVmdrOtApi');
-  assert.equal(require('../dist/nodes/Qualys/QualysVmdrOt.node').QualysVmdrOt.name, 'QualysVmdrOt');
+  assert.equal(require('../.test-build/nodes/Qualys/QualysVmdrOt.node').QualysVmdrOt.name, 'QualysVmdrOt');
 
   const menu = description.properties[0];
   assert.deepEqual(

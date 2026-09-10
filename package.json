@@ -1,17 +1,9 @@
 {
   "name": "@syn-con/n8n-nodes-qualys",
-  "version": "2.0.8",
+  "version": "2.1.0",
   "description": "n8n community node for Qualys VMDR, VMDR OT and CyberSecurity Asset Management",
   "keywords": [
-    "n8n-community-node-package",
-    "n8n",
-    "qualys",
-    "vmdr",
-    "csam",
-    "asset-inventory",
-    "vulnerability-management",
-    "ot",
-    "security"
+    "n8n-community-node-package"
   ],
   "license": "MIT",
   "author": {
@@ -24,23 +16,28 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "n8n-node build",
-    "build:watch": "tsc --watch",
+    "build": "node scripts/build.mjs",
+    "build:watch": "tsc --outDir .test-build --declaration false --removeComments --watch",
     "dev": "n8n-node dev",
-    "format": "prettier --write README.md package.json tsconfig.json eslint.config.mjs index.ts credentials nodes tests",
+    "format": "prettier --write README.md package.json tsconfig.json eslint.config.mjs eslint.house.mjs index.ts credentials nodes scripts tests",
     "lint": "n8n-node lint",
     "lint:fix": "n8n-node lint --fix",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test tests/*.test.cjs",
-    "test:coverage": "npm run build && node --test --experimental-test-coverage --test-coverage-exclude=tests/** --test-coverage-branches=90 --test-coverage-lines=90 --test-coverage-functions=90 tests/*.test.cjs",
+    "test": "npm run build && npm run build:test && node --test tests/*.test.cjs",
+    "test:coverage": "npm run build && npm run build:test && node --test --experimental-test-coverage --test-coverage-exclude=tests/** --test-coverage-exclude=dist/** --test-coverage-branches=90 --test-coverage-lines=90 --test-coverage-functions=90 tests/*.test.cjs",
     "release": "n8n-node release",
-    "prepublishOnly": "n8n-node prerelease"
+    "prepublishOnly": "n8n-node prerelease",
+    "build:test": "tsc --outDir .test-build --declaration false --removeComments",
+    "lint:house": "eslint . --config eslint.house.mjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
+    "strict": true,
     "credentials": [
       "dist/credentials/QualysVmdrOtApi.credentials.js"
     ],
@@ -52,7 +49,9 @@
     "@eslint/js": "^9.36.0",
     "@n8n/node-cli": "^0.45.6",
     "@types/node": "^24.3.1",
+    "esbuild": "^0.28.2",
     "eslint": "^9.36.0",
+    "fast-xml-parser": "^5.11.1",
     "globals": "^16.3.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2",
@@ -63,9 +62,6 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "dependencies": {
-    "fast-xml-parser": "^5.11.1"
   },
   "homepage": "https://github.com/syn-con/n8n-qualys#readme",
   "repository": {
