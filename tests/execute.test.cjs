@@ -536,3 +536,82 @@ test('fails loudly rather than paging forever', async () => {
     /Stopped after \d+ requests/,
   );
 });
+
+// ------------------------------------------------ KnowledgeBase QID windowing
+
+const vulnXml = (qids) =>
+  `<KNOWLEDGE_BASE_VULN_LIST_OUTPUT><RESPONSE><VULN_LIST>` +
+  qids.map((qid) => `<VULN><QID>${qid}</QID></VULN>`).join('') +
+  `</VULN_LIST></RESPONSE></KNOWLEDGE_BASE_VULN_LIST_OUTPUT>`;
+
+test('walks the KnowledgeBase in QID windows, since the API has no paging', async () => {
+  // Everything matching comes back in one response, and in full detail that is
+  // larger than a JS string can hold - so a full pull is chunked by QID.
+  const { items, calls } = await execute({
+    params: listParams('listKnowledgeBase', {
+      listAll: true,
+      idWindowSize: 1000,
+      knowledgeBaseOptions: {},
+    }),
+    script: (options) => raw(200, vulnXml(Number(options.qs.id_min) <= 2001 ? [options.qs.id_min] : [])),
+  });
+
+  assert.deepEqual(items.map((i) => Number(i.json.QID)), [1, 1001, 2001]);
+  assert.deepEqual(calls.slice(0, 3).map((c) => [c.qs.id_min, c.qs.id_max]), [
+    [1, 1000],
+    [1001, 2000],
+    [2001, 3000],
+  ]);
+  // QIDs are sparse, so the walk only gives up after a run of empty windows.
+  assert.equal(calls.length, 3 + 10);
+});
+
+test('treats an explicit QID range as the bounds of the walk', async () => {
+  const { calls } = await execute({
+    params: listParams('listKnowledgeBase', {
+      listAll: true,
+      idWindowSize: 10,
+      knowledgeBaseOptions: { id_min: '5', id_max: '25' },
+    }),
+    script: () => raw(200, vulnXml([])),
+  });
+
+  assert.deepEqual(calls.map((c) => [c.qs.id_min, c.qs.id_max]), [
+    [5, 14],
+    [15, 24],
+    [25, 25],
+  ]);
+});
+
+test('asks once when the KnowledgeBase request already names its QIDs', async () => {
+  const { items, calls } = await execute({
+    params: listParams('listKnowledgeBase', {
+      listAll: true,
+      knowledgeBaseOptions: { ids: '90001,90002' },
+    }),
+    script: () => raw(200, vulnXml([90001, 90002])),
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].qs.id_min, undefined);
+  assert.equal(calls[0].qs.ids, '90001,90002');
+  assert.equal(items.length, 2);
+});
+
+test('explains a response too large for Node to hold as a string', async () => {
+  await assert.rejects(
+    () =>
+      execute({
+        params: listParams('listKnowledgeBase', { knowledgeBaseOptions: { ids: '1-99999' } }),
+        script: () => {
+          throw new Error('Cannot create a string longer than 0x1fffffe8 characters');
+        },
+      }),
+    (error) => {
+      assert.match(error.message, /Cannot create a string longer than/);
+      assert.match(error.description, /larger than the maximum string Node can hold/);
+      assert.match(error.description, /Chunk Size/);
+      return true;
+    },
+  );
+});

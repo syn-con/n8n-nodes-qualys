@@ -178,6 +178,30 @@ export function describeFailure(context: FailureContext): string {
   return lines.join('\n');
 }
 
+/**
+ * V8 refuses to build a string past ~512 MB, and the HTTP helper buffers a
+ * response body into one before anything can parse it. An endpoint with no
+ * paging of its own - the KnowledgeBase in full detail, above all - hits that
+ * ceiling, and the raw message says nothing about which knobs narrow the pull.
+ */
+const OVERSIZED_RESPONSE =
+  /cannot create a string longer than|invalid string length|err_string_too_long/i;
+
+export function isOversizedResponse(error: unknown): boolean {
+  const message = (error as Error | undefined)?.message;
+  return typeof message === 'string' && OVERSIZED_RESPONSE.test(message);
+}
+
+/** The diagnostic block for a response too large to hold in memory. */
+export function describeOversizedResponse(context: FailureContext): string {
+  return [
+    describeFailure(context),
+    '',
+    'The response was larger than the maximum string Node can hold (about 512 MB), so it could not be read at all.',
+    'Narrow the request: set Detail Level to Basic, give QIDs or a Minimum/Maximum QID range, or filter by Modified After. Lowering Chunk Size splits a full KnowledgeBase pull into smaller responses.',
+  ].join('\n');
+}
+
 /** Pull a Qualys-specific status code out of a JSON or XML error body. */
 export function extractQualysCode(body: unknown): string | undefined {
   if (typeof body === 'string') {

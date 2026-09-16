@@ -50,6 +50,13 @@ export type OperationDefinition = {
   optionsProperty?: string;
   /** Batch size is controlled by `truncation_limit`. */
   truncatable?: boolean;
+  /**
+   * The endpoint has no paging of its own: it answers a query in one response,
+   * however large that gets. A full pull is therefore walked in windows of
+   * record id (`id_min`/`id_max`) so each response stays inside what Node can
+   * hold in a string.
+   */
+  idWindowed?: boolean;
   /** The record id goes in the path rather than the query string. */
   idInPath?: boolean;
 };

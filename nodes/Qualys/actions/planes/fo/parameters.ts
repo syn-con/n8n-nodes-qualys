@@ -1,6 +1,7 @@
 import type { INodeProperties } from 'n8n-workflow';
 
-import { TRUNCATABLE_OPS, usingOptions } from '../../shared/operationScopes';
+import { ID_WINDOWED_OPS, TRUNCATABLE_OPS, usingOptions } from '../../shared/operationScopes';
+import { FO_ID_WINDOW_SIZE } from '../../resources';
 
 /**
  * Platform API (qualysapi) parameters. This plane takes Qualys' documented named
@@ -15,6 +16,23 @@ const truncationProperty: INodeProperties = {
   description:
     'Records fetched per API call. 0 removes the limit, which Qualys advises against unless the request is narrowed by an ID or IP range.',
   displayOptions: { show: { operation: TRUNCATABLE_OPS } },
+};
+
+/**
+ * The KnowledgeBase API takes no truncation limit: it answers with every QID
+ * that matches, in one response, which in full detail is larger than Node can
+ * hold in a single string. The pull is therefore split into windows of QID,
+ * and this is how wide each one is.
+ */
+const idWindowProperty: INodeProperties = {
+  displayName: 'Chunk Size (QIDs)',
+  name: 'idWindowSize',
+  type: 'number',
+  default: FO_ID_WINDOW_SIZE,
+  typeOptions: { minValue: 1, numberPrecision: 0 },
+  description:
+    'How many QIDs each request covers. The API returns everything in range at once, so a smaller chunk means more requests but smaller responses. Lower it if a request fails because the response was too large.',
+  displayOptions: { show: { operation: ID_WINDOWED_OPS } },
 };
 
 const commonHostFilters: NonNullable<INodeProperties['options']> = [
@@ -79,6 +97,7 @@ const optionsCollection = (
 
 export const foProperties: INodeProperties[] = [
   truncationProperty,
+  idWindowProperty,
   optionsCollection('hostOptions', [
     ...commonHostFilters,
     { displayName: 'Detail Level', name: 'details', type: 'options', default: 'Basic', options: [{ name: 'All', value: 'All' }, { name: 'All With Asset Groups', value: 'All/AGs' }, { name: 'Basic', value: 'Basic' }, { name: 'Basic With Asset Groups', value: 'Basic/AGs' }, { name: 'None', value: 'None' }], description: 'How much host information to return' },
@@ -112,7 +131,9 @@ export const foProperties: INodeProperties[] = [
     extraParameters,
   ]),
   optionsCollection('knowledgeBaseOptions', [
-    { displayName: 'QIDs', name: 'ids', type: 'string', default: '', description: 'Comma-separated QIDs and ranges. Strongly recommended; the full KnowledgeBase is very large.' },
+    { displayName: 'QIDs', name: 'ids', type: 'string', default: '', description: 'Comma-separated QIDs and ranges. Sent as one request; without it the KnowledgeBase is walked in QID chunks.' },
+    { displayName: 'Minimum QID', name: 'id_min', type: 'string', default: '', description: 'Only QIDs at or above this value. Bounds where the chunked walk starts.' },
+    { displayName: 'Maximum QID', name: 'id_max', type: 'string', default: '', description: 'Only QIDs at or below this value. Bounds where the chunked walk stops.' },
     { displayName: 'Detail Level', name: 'details', type: 'options', default: 'Basic', options: [{ name: 'Basic', value: 'Basic' }, { name: 'All', value: 'All' }], description: 'How much vulnerability detail to return' },
     { displayName: 'CVE ID', name: 'cve', type: 'string', default: '', placeholder: 'CVE-2021-44228', description: 'Only vulnerabilities associated with this CVE' },
     { displayName: 'Patchable Only', name: 'is_patchable', type: 'boolean', default: false, description: 'Whether to return only vulnerabilities that have a patch' },

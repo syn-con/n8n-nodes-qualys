@@ -197,6 +197,13 @@ Each plane pages differently and the node handles all three: page numbers for OT
 Size** controls records per VMDR call (default 1000). Setting it to 0 removes the limit, which
 Qualys advises against unless you also narrow by an ID or IP range.
 
+**VMDR > List KnowledgeBase** is the exception. That API takes no batch size and answers with
+every matching QID in one response, which in full detail is larger than Node can hold in a
+single string. The node therefore walks the QID space in chunks, one request per **Chunk Size
+(QIDs)** window (default 10,000), stopping at **Maximum QID** or once a run of windows comes
+back empty. Naming **QIDs** outright sends a single request instead, and **Minimum QID** /
+**Maximum QID** bound the walk. Lower the chunk size if a response is still too large.
+
 Requests are issued serially. The platform API's concurrency limit is low — 2 on the
 subscriptions we measured — so parallel fetching would simply fail.
 

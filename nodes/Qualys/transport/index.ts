@@ -24,7 +24,9 @@ import type {
 import {
   asNodeError,
   describeFailure,
+  describeOversizedResponse,
   extractQualysCode,
+  isOversizedResponse,
   sanitizeForError,
   type FailureContext,
 } from './errors';
@@ -45,7 +47,9 @@ export {
   REDACTED,
   asNodeError,
   describeFailure,
+  describeOversizedResponse,
   extractQualysCode,
+  isOversizedResponse,
   redactSecretsInText,
   sanitizeForError,
 } from './errors';
@@ -165,9 +169,20 @@ export async function qualysApiRequest(
 
     throw new NodeApiError(this.getNode(), sanitizeForError(error), {
       message: message ? `Qualys request failed: ${message}` : 'Qualys request failed',
-      description: describeFailure(failure),
+      description: describeTransportFailure(error, failure),
     });
   }
+}
+
+/**
+ * A body too large to hold in a string never reaches the status check, so it
+ * lands here as a bare transport failure. Its own message names no endpoint and
+ * no remedy, so the diagnostic block supplies both.
+ */
+function describeTransportFailure(error: unknown, failure: FailureContext): string {
+  return isOversizedResponse(error)
+    ? describeOversizedResponse(failure)
+    : describeFailure(failure);
 }
 
 type Hosts = { gateway: string; platform: string };

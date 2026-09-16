@@ -37,6 +37,7 @@ export const vmdrResource: ResourceDefinition = {
       apiAction: 'list',
       recordPath: 'KNOWLEDGE_BASE_VULN_LIST_OUTPUT.RESPONSE.VULN_LIST.VULN',
       optionsProperty: 'knowledgeBaseOptions',
+      idWindowed: true,
     }),
     listCveScores: list({
       name: 'List CVE Scores',

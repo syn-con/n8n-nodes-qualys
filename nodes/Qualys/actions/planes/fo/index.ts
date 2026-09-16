@@ -8,7 +8,13 @@
 import { NodeOperationError, type IDataObject, type IExecuteFunctions } from 'n8n-workflow';
 
 import { findNextBatchUrl } from '../../../transport';
-import { FO_DEFAULT_TRUNCATION, type Operation } from '../../resources';
+import {
+  FO_DEFAULT_TRUNCATION,
+  FO_ID_WINDOW_CEILING,
+  FO_ID_WINDOW_EMPTY_RUN,
+  FO_ID_WINDOW_SIZE,
+  type Operation,
+} from '../../resources';
 import { getCollectionEntries } from '../../shared/collections';
 import type { Pager } from '../../shared/paging';
 
@@ -166,12 +172,93 @@ function buildFoQuery(
   return qs;
 }
 
+// ------------------------------------------------------- id-windowed paging
+
+/**
+ * A request that already names the records it wants comes back small, so it is
+ * sent as-is rather than walked. An id range is not such a request: it bounds
+ * the walk instead of replacing it.
+ */
+function isNarrowedToRecords(qs: IDataObject): boolean {
+  return ['ids', 'cve', 'qids'].some((key) => {
+    const value = qs[key];
+    return value !== undefined && value !== null && String(value).trim() !== '';
+  });
+}
+
+function boundary(qs: IDataObject, key: string): number | undefined {
+  const value = Number(qs[key]);
+  return Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+/**
+ * Walk an endpoint that has no paging of its own by asking for one id window at
+ * a time.
+ *
+ * The KnowledgeBase API answers `action=list` with every QID that matches, in a
+ * single response, and takes no truncation limit. In full detail that is far
+ * more than the ~512 MB string Node can build, so the request fails before a
+ * byte of it can be parsed. Splitting the id space into windows keeps each
+ * response small and makes a complete pull possible.
+ *
+ * A Minimum/Maximum QID supplied on the operation bounds the walk exactly; with
+ * no maximum the walk runs to a ceiling well above the highest QID Qualys has
+ * issued, stopping early once a run of windows comes back empty.
+ */
+function idWindowPager(
+  this: IExecuteFunctions,
+  definition: Operation,
+  itemIndex: number,
+  qs: IDataObject,
+): Pager {
+  const requested = Number(this.getNodeParameter('idWindowSize', itemIndex, FO_ID_WINDOW_SIZE));
+  const size = Number.isFinite(requested) && requested >= 1 ? Math.floor(requested) : FO_ID_WINDOW_SIZE;
+
+  const start = boundary(qs, 'id_min') ?? 1;
+  const end = boundary(qs, 'id_max');
+
+  let cursor = start;
+  let emptyRun = 0;
+  let done = false;
+
+  return {
+    next: () => {
+      if (done) {
+        return undefined;
+      }
+
+      const windowEnd = end === undefined ? cursor + size - 1 : Math.min(cursor + size - 1, end);
+
+      return {
+        plane: 'fo' as const,
+        endpoint: definition.endpoint,
+        method: 'GET' as const,
+        qs: { ...qs, id_min: cursor, id_max: windowEnd },
+        xml: definition.xml,
+      };
+    },
+    advance: (_body, pageRecordCount) => {
+      cursor += size;
+      emptyRun = pageRecordCount > 0 ? 0 : emptyRun + 1;
+
+      done =
+        end === undefined
+          ? cursor > FO_ID_WINDOW_CEILING || emptyRun >= FO_ID_WINDOW_EMPTY_RUN
+          : cursor > end;
+    },
+  };
+}
+
 /**
  * Platform API: the first call is built from parameters, every later call
  * follows the URL Qualys hands back in the WARNING element.
  */
 export function foPager(this: IExecuteFunctions, definition: Operation, itemIndex: number): Pager {
   const qs = buildFoQuery.call(this, definition, itemIndex);
+
+  if (definition.idWindowed && !isNarrowedToRecords(qs)) {
+    return idWindowPager.call(this, definition, itemIndex, qs);
+  }
 
   let nextUrl: string | undefined;
   let first = true;
