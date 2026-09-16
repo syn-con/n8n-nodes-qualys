@@ -121,6 +121,15 @@ export default [
 		},
 	},
 	{
+		files: ['nodes/*/trigger/**/*.ts'],
+		rules: {
+			// A poll follows the next-batch URL the current response names, so the
+			// requests cannot be issued together even in principle - and the
+			// platform API throttles hard on concurrency besides.
+			'no-await-in-loop': 'off',
+		},
+	},
+	{
 		files: ['**/*.test.ts', '**/*.spec.ts', 'tests/**/*.ts'],
 		rules: {
 			'@typescript-eslint/no-explicit-any': 'error',

@@ -12,13 +12,16 @@ Qualys is a cloud platform for vulnerability management and asset inventory. Thi
 from three of its API surfaces through a single node and a single credential: VMDR, VMDR OT and
 CyberSecurity Asset Management.
 
-The node is read-only. Nothing it does modifies your Qualys subscription.
+The package ships two nodes: **Qualys**, which reads on demand, and **Qualys Trigger**, which
+polls VMDR and starts a workflow when something changes. Both are read-only. Nothing either
+does modifies your Qualys subscription.
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/sustainable-use-license/)
 workflow automation platform.
 
 [Installation](#installation)
 [Operations](#operations)
+[Trigger](#trigger)
 [Credentials](#credentials)
 [Compatibility](#compatibility)
 [Usage](#usage)
@@ -105,6 +108,39 @@ Two operations behave unusually. **List IP Addresses** and **List Excluded Hosts
 single item holding the whole IP set, because Qualys mixes bare addresses and ranges in the
 same container. **List Dynamic Search Lists** is slow: Qualys evaluates each list's QID query
 server-side, and a handful of lists took over two minutes on a small subscription.
+
+## Trigger
+
+**Qualys Trigger** starts a workflow when VMDR reports a change. Qualys has no outbound
+webhook for these collections, so the node polls on whatever interval you set.
+
+| Event | Reads | Changed-since parameter |
+|---|---|---|
+| Detection Updated | `/api/5.0/fo/asset/host/vm/detection/` | `detection_updated_since` |
+| Host Scanned | `/api/5.0/fo/asset/host/` | `vm_scan_since` |
+| KnowledgeBase Updated | `/api/4.0/fo/knowledge_base/vuln/` | `last_modified_after` |
+| Scan Launched | `/api/2.0/fo/scan/` | `launched_after_datetime` |
+
+Each poll reads one window of time: from where the last poll stopped to the moment this one
+started. The mark lives in the node's static data, so restarting n8n resumes rather than
+replaying or skipping. **First Poll Covers (Minutes)** sets how far the very first poll
+reaches back — 0 emits only what happens after activation.
+
+**Max Records Per Poll** caps a single run so a backlog cannot flood the workflow. Nothing is
+dropped: the poll remembers Qualys' next-batch URL, the high-water mark stays put, and the
+following poll finishes that window before opening a new one. Batches are taken whole, so a
+poll can overshoot the cap by up to one **Batch Size**.
+
+**Detection Updated** asks for Fixed detections as well as New, Active and Re-Opened — the
+API omits them otherwise, and a remediation workflow is usually waiting for exactly that.
+It offers the same **Item Granularity** choice as the node.
+
+Delivery is at-least-once. Qualys' date filters are inclusive, so a record that changes
+exactly on a window boundary can arrive twice; key on the record rather than on the fact that
+the workflow ran.
+
+Pressing **Fetch Test Event** in the editor reads the lookback window and deliberately leaves
+the stored mark alone, so testing cannot make the live trigger skip records.
 
 ## Credentials
 
@@ -302,6 +338,15 @@ raw-header and socket internals dropped, reference cycles broken, and size bound
 * [Qualys API authentication](https://docs.qualys.com/en/csam/api/get_started/API_Authentication.htm)
 
 ## Version history
+
+### 2.2
+
+Adds **Qualys Trigger**, a polling trigger for VMDR detections, hosts, KnowledgeBase changes
+and scans. Existing workflows are untouched: it is a second node, not a change to the first.
+
+**List KnowledgeBase** now walks the QID space in chunks rather than asking for the whole
+KnowledgeBase at once, which failed outright on a response larger than Node can hold in a
+string. Naming **QIDs** still sends a single request.
 
 ### 2.1
 

@@ -31,6 +31,7 @@ await build({
   entryPoints: [
     'index.ts',
     'nodes/Qualys/QualysVmdrOt.node.ts',
+    'nodes/Qualys/QualysVmdrTrigger.node.ts',
     'credentials/QualysVmdrOtApi.credentials.ts',
   ],
   outdir: OUT,

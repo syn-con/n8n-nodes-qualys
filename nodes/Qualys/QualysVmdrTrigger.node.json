@@ -1,0 +1,18 @@
+{
+  "node": "@synergyconsulting/n8n-nodes-qualys.qualysVmdrTrigger",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Security", "Utility"],
+  "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://docs.qualys.com/en/csam/api/get_started/API_Authentication.htm"
+      }
+    ],
+    "primaryDocumentation": [
+      {
+        "url": "https://docs.qualys.com/en/vm/api/index.htm"
+      }
+    ]
+  }
+}

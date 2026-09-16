@@ -4,13 +4,16 @@ import type {
   IExecuteSingleFunctions,
   IHookFunctions,
   ILoadOptionsFunctions,
+  IPollFunctions,
 } from 'n8n-workflow';
 
 export type QualysRequestContext =
   | IExecuteFunctions
   | IExecuteSingleFunctions
   | IHookFunctions
-  | ILoadOptionsFunctions;
+  | ILoadOptionsFunctions
+  // A polling trigger authenticates and pages exactly as an execution does.
+  | IPollFunctions;
 
 export type QualysPlane = 'ot' | 'gateway' | 'csam' | 'fo';
 

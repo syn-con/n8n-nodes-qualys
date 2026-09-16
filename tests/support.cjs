@@ -151,12 +151,29 @@ const listParams = (operation, extra = {}) => ({
   ...extra,
 });
 
+/**
+ * The same stub shaped for a polling trigger. `IPollFunctions` drops the item
+ * index - its second argument is the fallback - and adds the mode and the
+ * static data a poll keeps its high-water mark in.
+ */
+function makePollContext({ staticData = {}, mode = 'trigger', ...options } = {}) {
+  const built = makeContext(options);
+  const { params = {} } = options;
+
+  built.context.getNodeParameter = (name, fallback) => (name in params ? params[name] : fallback);
+  built.context.getMode = () => mode;
+  built.context.getWorkflowStaticData = () => staticData;
+
+  return { ...built, staticData };
+}
+
 module.exports = {
   sleeps,
   NodeApiError,
   NodeOperationError,
   CREDENTIALS,
   makeContext,
+  makePollContext,
   jwt,
   json,
   raw,
