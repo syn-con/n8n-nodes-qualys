@@ -114,6 +114,9 @@ server-side, and a handful of lists took over two minutes on a small subscriptio
 **Qualys Trigger** starts a workflow when VMDR reports a change. Qualys has no outbound
 webhook for these collections, so the node polls on whatever interval you set.
 
+It is not a separate app in the nodes panel: searching Qualys finds one entry, with these
+events under **Triggers** and the read operations under **Actions**.
+
 | Event | Reads | Changed-since parameter |
 |---|---|---|
 | Detection Updated | `/api/5.0/fo/asset/host/vm/detection/` | `detection_updated_since` |

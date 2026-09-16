@@ -1,5 +1,5 @@
 {
-  "node": "@synergyconsulting/n8n-nodes-qualys.qualysVmdrTrigger",
+  "node": "@synergyconsulting/n8n-nodes-qualys.qualysVmdrOtTrigger",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
   "categories": ["Security", "Utility"],

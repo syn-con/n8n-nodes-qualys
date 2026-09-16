@@ -10,13 +10,13 @@ const test = require('node:test');
 
 const { makePollContext, raw } = require('./support.cjs');
 
-const { QualysVmdrTrigger } = require('../.test-build/nodes/Qualys/QualysVmdrTrigger.node');
+const { QualysVmdrOtTrigger } = require('../.test-build/nodes/Qualys/QualysVmdrOtTrigger.node');
 const { clearTokenCache } = require('../.test-build/nodes/Qualys/transport');
 
 async function poll(options) {
   clearTokenCache();
   const built = makePollContext(options);
-  const result = await new QualysVmdrTrigger().poll.call(built.context);
+  const result = await new QualysVmdrOtTrigger().poll.call(built.context);
   return { result, calls: built.calls, staticData: built.staticData };
 }
 
@@ -198,4 +198,35 @@ test('stops after the page backstop, leaving the backlog for the next poll', asy
   assert.equal(calls.length, 100);
   assert.equal(staticData.since, undefined);
   assert.equal(staticData.resumeUrl, NEXT_BATCH);
+});
+
+// ------------------------------------------------------------- the node panel
+
+test('presents itself as the Qualys node trigger rather than a node of its own', () => {
+  const { description } = new QualysVmdrOtTrigger();
+  const node = require('../.test-build/nodes/Qualys/QualysVmdrOt.node').QualysVmdrOt;
+  const action = new node().description;
+
+  // n8n's node panel merges a trigger into its action node by name: the
+  // trigger's must be the action node's plus "Trigger", or the two show up as
+  // separate apps in search.
+  assert.equal(description.name, `${action.name}Trigger`);
+  assert.equal(description.displayName, `${action.displayName} Trigger`);
+  assert.deepEqual(description.credentials, action.credentials);
+  assert.ok(description.group.includes('trigger'));
+  assert.equal(description.polling, true);
+  assert.deepEqual(description.inputs, []);
+
+  // Each event is one entry under the merged node's Triggers tab.
+  const events = description.properties[0];
+  assert.equal(events.name, 'event');
+  for (const option of events.options) {
+    assert.match(option.action, /^On /, `${option.value} has no trigger action`);
+  }
+  assert.ok(events.options.some((option) => option.value === events.default));
+});
+
+test('ships a codex naming the node it belongs to', () => {
+  const codex = require('../nodes/Qualys/QualysVmdrOtTrigger.node.json');
+  assert.match(codex.node, /\.qualysVmdrOtTrigger$/);
 });

@@ -17,6 +17,8 @@ import { OPERATIONS, type Operation } from '../actions/resources';
 export type TriggerEvent = {
   /** Menu entry. */
   name: string;
+  /** Shown in n8n's node panel, under the Qualys node's Triggers tab. */
+  action: string;
   description: string;
   /** The list operation this event reads, by name in the operation table. */
   operation: string;
@@ -29,6 +31,7 @@ export type TriggerEvent = {
 export const TRIGGER_EVENTS: Record<string, TriggerEvent> = {
   detectionUpdated: {
     name: 'Detection Updated',
+    action: 'On a detection changing',
     description:
       'A vulnerability detection was found, reopened, fixed or otherwise changed status on a host',
     operation: 'listDetections',
@@ -40,18 +43,21 @@ export const TRIGGER_EVENTS: Record<string, TriggerEvent> = {
   },
   hostScanned: {
     name: 'Host Scanned',
+    action: 'On a host being scanned',
     description: 'A host was scanned and its results processed',
     operation: 'listHosts',
     since: 'vm_scan_since',
   },
   knowledgeBaseUpdated: {
     name: 'KnowledgeBase Updated',
+    action: 'On a QID being published or revised',
     description: 'Qualys published or revised a QID',
     operation: 'listKnowledgeBase',
     since: 'last_modified_after',
   },
   scanLaunched: {
     name: 'Scan Launched',
+    action: 'On a scan starting',
     description: 'A scan started, whether on demand, scheduled or through the API',
     operation: 'listScans',
     since: 'launched_after_datetime',
@@ -71,7 +77,12 @@ const eventProperty: INodeProperties = {
   default: 'detectionUpdated',
   description: 'Which change to watch for',
   options: Object.entries(TRIGGER_EVENTS)
-    .map(([value, event]) => ({ name: event.name, value, description: event.description }))
+    .map(([value, event]) => ({
+      name: event.name,
+      value,
+      description: event.description,
+      action: event.action,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name)),
 };
 

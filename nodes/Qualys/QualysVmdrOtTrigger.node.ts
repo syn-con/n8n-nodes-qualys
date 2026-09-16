@@ -20,10 +20,10 @@ const MAIN: NodeConnectionType = 'main';
  * slice of time since the last one, using the "changed since" parameter the
  * endpoint documents, rather than re-reading the collection and diffing it.
  */
-export class QualysVmdrTrigger implements INodeType {
+export class QualysVmdrOtTrigger implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'Qualys Trigger',
-    name: 'qualysVmdrTrigger',
+    name: 'qualysVmdrOtTrigger',
     group: ['trigger'],
     icon: { light: 'file:../../icons/qualys.svg', dark: 'file:../../icons/qualys.dark.svg' },
     version: 1,
