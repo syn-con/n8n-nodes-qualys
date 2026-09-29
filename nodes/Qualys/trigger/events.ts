@@ -101,32 +101,6 @@ export const triggerProperties: INodeProperties[] = [
     displayOptions: { show: { event: ['detectionUpdated'] } },
   },
   {
-    displayName: 'First Poll Covers (Minutes)',
-    name: 'lookbackMinutes',
-    type: 'number',
-    default: 60,
-    typeOptions: { minValue: 0, numberPrecision: 0 },
-    description:
-      'How far back the first poll reaches. Later polls start where the previous one ended. Set to 0 to emit nothing that happened before the workflow was activated.',
-  },
-  {
-    displayName: 'Max Records Per Poll',
-    name: 'maxRecords',
-    type: 'number',
-    default: 1000,
-    typeOptions: { minValue: 0, numberPrecision: 0 },
-    description:
-      'Caps a single poll, so a long backlog cannot flood the workflow. 0 fetches everything the interval turned up. A backlog is not skipped: the next poll resumes where this one stopped, and the high-water mark only moves once the window has drained. Records arrive in whole batches, so a poll can overshoot by up to one Batch Size.',
-  },
-  {
-    displayName: 'Batch Size',
-    name: 'truncationLimit',
-    type: 'number',
-    default: 1000,
-    typeOptions: { minValue: 0, numberPrecision: 0 },
-    description: 'Records fetched per API call. Polls follow the next-batch URL until the interval is covered.',
-  },
-  {
     displayName: 'Options',
     name: 'options',
     type: 'collection',
@@ -134,6 +108,14 @@ export const triggerProperties: INodeProperties[] = [
     default: {},
     options: [
       { displayName: 'Asset Group IDs', name: 'ag_ids', type: 'string', default: '', description: 'Comma-separated asset group IDs to watch' },
+      {
+        displayName: 'Batch Size',
+        name: 'truncationLimit',
+        type: 'number',
+        default: 1000,
+        typeOptions: { minValue: 0, numberPrecision: 0 },
+        description: 'Records fetched per API call. Polls follow the next-batch URL until the interval is covered.',
+      },
       {
         displayName: 'Extra Parameters',
         name: 'extraParameters',
@@ -152,7 +134,25 @@ export const triggerProperties: INodeProperties[] = [
           },
         ],
       },
+      {
+        displayName: 'First Poll Covers (Minutes)',
+        name: 'lookbackMinutes',
+        type: 'number',
+        default: 60,
+        typeOptions: { minValue: 0, numberPrecision: 0 },
+        description:
+          'How far back the first poll reaches. Later polls start where the previous one ended. Set to 0 to emit nothing that happened before the workflow was activated.',
+      },
       { displayName: 'IP Addresses', name: 'ips', type: 'string', default: '', description: 'Comma-separated addresses and ranges to watch' },
+      {
+        displayName: 'Max Records Per Poll',
+        name: 'maxRecords',
+        type: 'number',
+        default: 1000,
+        typeOptions: { minValue: 0, numberPrecision: 0 },
+        description:
+          'Caps a single poll, so a long backlog cannot flood the workflow. 0 fetches everything the interval turned up. A backlog is not skipped: the next poll resumes where this one stopped, and the high-water mark only moves once the window has drained. Records arrive in whole batches, so a poll can overshoot by up to one Batch Size.',
+      },
       { displayName: 'QIDs', name: 'qids', type: 'string', default: '', description: 'Comma-separated QIDs and ranges to watch' },
       { displayName: 'Severities', name: 'severities', type: 'string', default: '', description: 'Comma-separated severity levels or ranges, for example 4-5' },
     ],

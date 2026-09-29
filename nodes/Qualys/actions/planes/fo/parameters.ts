@@ -5,7 +5,8 @@ import { FO_ID_WINDOW_SIZE } from '../../resources';
 
 /**
  * Platform API (qualysapi) parameters. This plane takes Qualys' documented named
- * parameters directly, so each operation gets its own Options collection.
+ * parameters directly, so each operation gets its own Additional Fields
+ * collection. The node-wide Options collection is for how output is shaped.
  */
 const truncationProperty: INodeProperties = {
   displayName: 'Batch Size',
@@ -79,17 +80,17 @@ const extraParameters: NonNullable<INodeProperties['options']>[number] = {
 };
 
 /**
- * Options collections bind to whichever operations name them in the endpoint
+ * Additional Fields collections bind to whichever operations name them in the endpoint
  * table, so moving an endpoint between resources cannot orphan its UI.
  */
 const optionsCollection = (
   name: string,
   options: NonNullable<INodeProperties['options']>,
 ): INodeProperties => ({
-  displayName: 'Options',
+  displayName: 'Additional Fields',
   name,
   type: 'collection',
-  placeholder: 'Add option',
+  placeholder: 'Add Field',
   default: {},
   displayOptions: { show: { operation: usingOptions(name) } },
   options,

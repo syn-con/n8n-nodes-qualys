@@ -1,6 +1,6 @@
 import type { INodeProperties } from 'n8n-workflow';
 
-import { COUNT_OPS, LIST_OPS } from './shared/operationScopes';
+import { LIST_OPS } from './shared/operationScopes';
 import { csamProperties } from './planes/csam/parameters';
 import { otFilterProperties } from './planes/ot/parameters';
 import { foProperties } from './planes/fo/parameters';
@@ -60,30 +60,21 @@ const operationProperties: INodeProperties[] = Object.entries(RESOURCES).map(
 
 const pagingProperties: INodeProperties[] = [
   {
-    displayName: 'Run Once For All Items',
-    name: 'runOnce',
-    type: 'boolean',
-    default: true,
-    description:
-      'Whether to run a single query regardless of how many input items arrive. Turn this off to run the query once per input item, so that parameters and filters can reference each item with expressions.',
-    displayOptions: { show: { operation: [...LIST_OPS, ...COUNT_OPS] } },
-  },
-  {
-    displayName: 'List All',
-    name: 'listAll',
+    displayName: 'Return All',
+    name: 'returnAll',
     type: 'boolean',
     default: false,
-    description: 'Whether to return every matching record, paging until the API is exhausted',
+    description: 'Whether to return all results or only up to a given limit',
     displayOptions: { show: { operation: LIST_OPS } },
   },
   {
-    displayName: 'Count',
-    name: 'count',
+    displayName: 'Limit',
+    name: 'limit',
     type: 'number',
-    default: 100,
-    typeOptions: { minValue: 0, numberPrecision: 0 },
-    description: 'Maximum records to return. Ignored when List All is enabled.',
-    displayOptions: { show: { operation: LIST_OPS, listAll: [false] } },
+    default: 50,
+    typeOptions: { minValue: 1 },
+    description: 'Max number of results to return',
+    displayOptions: { show: { operation: LIST_OPS, returnAll: [false] } },
   },
 ];
 
@@ -103,24 +94,33 @@ const outputProperties: INodeProperties[] = [
     displayOptions: { show: { operation: ['listDetections'] } },
   },
   {
-    displayName: 'Output Mode',
-    name: 'outputMode',
-    type: 'options',
-    options: [
-      { name: 'Items', value: 'items', description: 'One item per record' },
-      { name: 'Raw Response', value: 'raw', description: 'A single item holding every page verbatim' },
-    ],
-    default: 'items',
-    description: 'How the response is emitted',
+    displayName: 'Options',
+    name: 'options',
+    type: 'collection',
+    placeholder: 'Add option',
+    default: {},
     displayOptions: { show: { operation: LIST_OPS } },
-  },
-  {
-    displayName: 'Add Response Metadata',
-    name: 'includeMetadata',
-    type: 'boolean',
-    default: false,
-    description: 'Whether to attach a _qualys object carrying endpoint, paging and rate limit details',
-    displayOptions: { show: { operation: LIST_OPS, outputMode: ['items'] } },
+    options: [
+      {
+        displayName: 'Add Response Metadata',
+        name: 'includeMetadata',
+        type: 'boolean',
+        default: false,
+        description:
+          'Whether to attach a _qualys object carrying endpoint, paging and rate limit details. Ignored when Output Mode is Raw Response.',
+      },
+      {
+        displayName: 'Output Mode',
+        name: 'outputMode',
+        type: 'options',
+        options: [
+          { name: 'Items', value: 'items', description: 'One item per record' },
+          { name: 'Raw Response', value: 'raw', description: 'A single item holding every page verbatim' },
+        ],
+        default: 'items',
+        description: 'How the response is emitted',
+      },
+    ],
   },
 ];
 

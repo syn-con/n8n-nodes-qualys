@@ -32,6 +32,35 @@ const MAX_POLL_PAGES = 100;
 
 const DEFAULT_LOOKBACK_MINUTES = 60;
 const DEFAULT_TRUNCATION = 1000;
+const DEFAULT_MAX_RECORDS = 1000;
+
+/**
+ * The Options collection mixes how the trigger polls with the Qualys filters it
+ * sends. The polling settings are split off here, so that everything left over
+ * can be passed to the API verbatim.
+ */
+type PollOptions = {
+  lookbackMinutes: number;
+  maxRecords: number;
+  truncationLimit: number;
+  filters: IDataObject;
+};
+
+function readOptions(this: IPollFunctions): PollOptions {
+  const { lookbackMinutes, maxRecords, truncationLimit, ...filters } = this.getNodeParameter(
+    'options',
+    {},
+  ) as IDataObject;
+
+  const truncation = Number(truncationLimit ?? DEFAULT_TRUNCATION);
+
+  return {
+    lookbackMinutes: Number(lookbackMinutes ?? DEFAULT_LOOKBACK_MINUTES),
+    maxRecords: Math.max(0, Number(maxRecords ?? DEFAULT_MAX_RECORDS) || 0),
+    truncationLimit: Number.isFinite(truncation) ? Math.max(0, truncation) : DEFAULT_TRUNCATION,
+    filters,
+  };
+}
 
 /**
  * What survives between polls.
@@ -89,8 +118,7 @@ function readEvent(this: IPollFunctions): TriggerEvent {
  * the first real poll would and never resumes a backlog, so testing a workflow
  * cannot consume records the live trigger has not emitted yet.
  */
-function openWindow(this: IPollFunctions, state: PollState, manual: boolean, now: Date): Window {
-  const lookback = Number(this.getNodeParameter('lookbackMinutes', DEFAULT_LOOKBACK_MINUTES));
+function openWindow(state: PollState, lookback: number, manual: boolean, now: Date): Window {
 
   if (manual) {
     return { since: lookbackFrom(now, lookback), until: formatQualysDate(now) };
@@ -111,15 +139,12 @@ function openWindow(this: IPollFunctions, state: PollState, manual: boolean, now
 }
 
 /** The query for a fresh window. A resumed one reuses the URL Qualys handed back. */
-function buildQuery(this: IPollFunctions, event: TriggerEvent, since: string): IDataObject {
-  const options = this.getNodeParameter('options', {}) as IDataObject;
-  const truncation = Number(this.getNodeParameter('truncationLimit', DEFAULT_TRUNCATION));
-
+function buildQuery(event: TriggerEvent, options: PollOptions, since: string): IDataObject {
   return {
     ...event.defaults,
-    ...buildFoParameters(options),
+    ...buildFoParameters(options.filters),
     action: operationFor(event).apiAction ?? 'list',
-    truncation_limit: Number.isFinite(truncation) ? Math.max(0, truncation) : DEFAULT_TRUNCATION,
+    truncation_limit: options.truncationLimit,
     [event.since]: since,
   };
 }
@@ -152,9 +177,10 @@ async function readWindow(
   event: TriggerEvent,
   definition: Operation,
   window: Window,
-  maxRecords: number,
+  options: PollOptions,
 ): Promise<{ records: unknown[]; nextUrl: string | undefined }> {
-  const qs = buildQuery.call(this, event, window.since);
+  const qs = buildQuery(event, options, window.since);
+  const { maxRecords } = options;
   const records: unknown[] = [];
 
   let nextUrl = window.resumeUrl;
@@ -208,15 +234,15 @@ export async function poll(this: IPollFunctions): Promise<INodeExecutionData[][]
   const event = readEvent.call(this);
   const manual = this.getMode() === 'manual';
   const state = this.getWorkflowStaticData('node') as PollState;
-  const maxRecords = Math.max(0, Number(this.getNodeParameter('maxRecords', 1000)) || 0);
+  const options = readOptions.call(this);
 
-  const window = openWindow.call(this, state, manual, new Date());
+  const window = openWindow(state, options.lookbackMinutes, manual, new Date());
   const { records, nextUrl } = await readWindow.call(
     this,
     event,
     operationFor(event),
     window,
-    maxRecords,
+    options,
   );
 
   if (!manual) {

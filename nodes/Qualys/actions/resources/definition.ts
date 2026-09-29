@@ -46,7 +46,7 @@ export type OperationDefinition = {
   pageSize?: { default: number; max: number };
   /** Which filter document the endpoint expects. */
   filterShape?: 'assetCriteria' | 'componentFilter';
-  /** Node property holding this operation's Options collection, if it has one. */
+  /** Node property holding this operation's Additional Fields collection, if it has one. */
   optionsProperty?: string;
   /** Batch size is controlled by `truncation_limit`. */
   truncatable?: boolean;

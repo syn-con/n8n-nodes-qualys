@@ -472,28 +472,14 @@ test('flattens detections onto their host context', () => {
   ]);
 });
 
-test('runs get once per input item, and list once by default', () => {
-  const ctx = (itemCount, params = {}) => ({
+test('runs once per input item, and once with no input at all', () => {
+  const ctx = (itemCount) => ({
     getInputData: () => Array.from({ length: itemCount }, () => ({ json: {} })),
-    getNodeParameter: (name, _index, fallback) => (name in params ? params[name] : fallback),
   });
 
-  // `get` addresses one record, so every input item gets its own request.
-  assert.deepEqual(resolveItemIndices.call(ctx(3), 'get'), [0, 1, 2]);
-
-  // `list` describes a whole query; running per item would emit the full result
-  // set once per item, which is the duplication fixed in 760689d.
-  assert.deepEqual(resolveItemIndices.call(ctx(3), 'list'), [0]);
-  assert.deepEqual(resolveItemIndices.call(ctx(3), 'count'), [0]);
-
-  // Opting in gives one query per input item so expressions can reference each.
-  assert.deepEqual(resolveItemIndices.call(ctx(3, { runOnce: false }), 'list'), [0, 1, 2]);
-  assert.deepEqual(resolveItemIndices.call(ctx(3, { runOnce: true }), 'list'), [0]);
-
-  // An empty input still runs once rather than doing nothing.
-  assert.deepEqual(resolveItemIndices.call(ctx(0), 'list'), [0]);
-  assert.deepEqual(resolveItemIndices.call(ctx(0), 'get'), [0]);
-  assert.deepEqual(resolveItemIndices.call(ctx(0, { runOnce: false }), 'list'), [0]);
+  // A single query for many items is n8n's Execute Once setting, not the node's.
+  assert.deepEqual(resolveItemIndices.call(ctx(3)), [0, 1, 2]);
+  assert.deepEqual(resolveItemIndices.call(ctx(0)), [0]);
 });
 
 test('leaves every data field open to expressions', () => {
@@ -578,7 +564,7 @@ test('takes records from a page up to the remaining count', () => {
     records: ['a', 'b'],
     nextCount: 0,
   });
-  // List All: every page is taken whole and the budget never runs down.
+  // Return All: every page is taken whole and the budget never runs down.
   assert.deepEqual(takeRecordsFromPage(['a', 'b'], Number.POSITIVE_INFINITY), {
     records: ['a', 'b'],
     nextCount: Number.POSITIVE_INFINITY,
@@ -651,8 +637,8 @@ test('describes the node and its resource menu', () => {
     'a resource has no name or description',
   );
 
-  assert.equal(propertyByName('listAll').type, 'boolean');
-  assert.equal(propertyByName('count').default, 100);
+  assert.equal(propertyByName('returnAll').type, 'boolean');
+  assert.equal(propertyByName('limit').default, 50);
   assert.equal(propertyByName('truncationLimit').default, 1000);
 });
 

@@ -90,7 +90,7 @@ export async function router(this: IExecuteFunctions): Promise<INodeExecutionDat
     });
   }
 
-  for (const itemIndex of resolveItemIndices.call(this, definition.kind)) {
+  for (const itemIndex of resolveItemIndices.call(this)) {
     try {
       // Sequential by design: a pager cannot build its next request until the
       // current response comes back, and Qualys throttles hard on concurrency.
@@ -115,24 +115,14 @@ export async function router(this: IExecuteFunctions): Promise<INodeExecutionDat
 }
 
 /**
- * Which input items to run against.
- *
- * `get` addresses a single record, so it runs once per input item and its
- * parameters resolve against that item. `list` and `count` describe a whole
- * query, so by default they run once no matter how many items arrive -
- * otherwise the full result set would be emitted once per item. Turning off
- * "Run Once For All Items" opts into per-item execution so parameters can
- * reference each upstream item.
+ * Which input items to run against: every one, so parameters resolve against
+ * each upstream item. A list or count that should run a single query however
+ * many items arrive uses n8n's own Execute Once node setting, which hands the
+ * node just the first item. With no input at all the node still runs once.
  */
-export function resolveItemIndices(
-  this: IExecuteFunctions,
-  kind: QualysOperationKind,
-): number[] {
+export function resolveItemIndices(this: IExecuteFunctions): number[] {
   const itemCount = Math.max(1, this.getInputData().length);
-
-  const perItem = kind === 'get' || !(this.getNodeParameter('runOnce', 0, true) as boolean);
-
-  return perItem ? Array.from({ length: itemCount }, (_, index) => index) : [0];
+  return Array.from({ length: itemCount }, (_, index) => index);
 }
 
 // ------------------------------------------------------------------- list
@@ -142,20 +132,21 @@ async function executeList(
   definition: Operation,
   itemIndex: number,
 ): Promise<INodeExecutionData[]> {
-  const listAll = this.getNodeParameter('listAll', itemIndex, false) as boolean;
-  const count = Math.max(0, Number(this.getNodeParameter('count', itemIndex, 100)));
-  const limit = resolveRecordLimit(count, listAll);
+  const returnAll = this.getNodeParameter('returnAll', itemIndex, false) as boolean;
+  const requested = Math.max(0, Number(this.getNodeParameter('limit', itemIndex, 50)));
+  const limit = resolveRecordLimit(requested, returnAll);
 
   if (limit === null) {
     throw new NodeOperationError(
       this.getNode(),
-      'Count must be greater than 0 unless List All is enabled.',
+      'Limit must be greater than 0 unless Return All is enabled.',
       { itemIndex },
     );
   }
 
-  const outputMode = this.getNodeParameter('outputMode', itemIndex, 'items') as QualysOutputMode;
-  const includeMetadata = this.getNodeParameter('includeMetadata', itemIndex, false) as boolean;
+  const options = this.getNodeParameter('options', itemIndex, {}) as IDataObject;
+  const outputMode = (options.outputMode ?? 'items') as QualysOutputMode;
+  const includeMetadata = options.includeMetadata === true;
 
   const records: unknown[] = [];
   const rawPages: Array<{ body: IDataObject; metadata: ResponseMetadata }> = [];

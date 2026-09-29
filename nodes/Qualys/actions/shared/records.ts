@@ -124,25 +124,25 @@ export function flattenDetections(hosts: unknown[]): IDataObject[] {
   return out;
 }
 
-export function resolveRecordLimit(count: number, listAll: boolean): number | null {
-  if (listAll) {
+export function resolveRecordLimit(limit: number, returnAll: boolean): number | null {
+  if (returnAll) {
     return Number.POSITIVE_INFINITY;
   }
 
-  const parsed = Number(count);
-  // A non-numeric Count must be rejected rather than silently becoming NaN,
+  const parsed = Number(limit);
+  // A non-numeric Limit must be rejected rather than silently becoming NaN,
   // which would page the entire result set and then emit nothing.
   if (!Number.isFinite(parsed)) {
     return null;
   }
 
-  const normalizedCount = Math.max(0, Math.floor(parsed));
-  return normalizedCount === 0 ? null : normalizedCount;
+  const normalized = Math.max(0, Math.floor(parsed));
+  return normalized === 0 ? null : normalized;
 }
 
 /**
  * Take as much of a page as the remaining budget allows, and report what is
- * left. `List All` sets the budget to Infinity, which takes every page whole.
+ * left. Return All sets the budget to Infinity, which takes every page whole.
  */
 export function takeRecordsFromPage(
   pageRecords: unknown[],

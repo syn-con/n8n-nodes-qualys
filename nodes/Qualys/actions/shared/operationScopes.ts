@@ -25,6 +25,6 @@ export const CSAM_OPS = operationsWhere(
 export const TRUNCATABLE_OPS = operationsWhere((operation) => operation.truncatable);
 export const ID_WINDOWED_OPS = operationsWhere((operation) => operation.idWindowed);
 
-/** Operations whose Options collection is the named node property. */
+/** Operations whose Additional Fields collection is the named node property. */
 export const usingOptions = (property: string): string[] =>
   operationsWhere((operation) => operation.optionsProperty === property);

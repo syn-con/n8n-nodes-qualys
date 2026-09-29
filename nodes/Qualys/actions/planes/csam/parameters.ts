@@ -76,10 +76,10 @@ export const csamProperties: INodeProperties[] = [
     ],
   },
   {
-    displayName: 'Options',
+    displayName: 'Additional Fields',
     name: 'csamOptions',
     type: 'collection',
-    placeholder: 'Add option',
+    placeholder: 'Add Field',
     default: {},
     displayOptions: { show: { operation: CSAM_OPS } },
     options: [

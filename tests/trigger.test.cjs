@@ -41,7 +41,7 @@ const NEXT_BATCH =
 
 test('the first poll reaches back over the lookback window', async () => {
   const { result, calls, staticData } = await poll({
-    params: { event: 'detectionUpdated', lookbackMinutes: 60 },
+    params: { event: 'detectionUpdated', options: { lookbackMinutes: 60 } },
     script: () => raw(200, detectionXml([[1, 90001]])),
   });
 
@@ -84,7 +84,7 @@ test('reports nothing rather than an empty item when nothing changed', async () 
 
 test('a window that stops early keeps the mark and resumes next time', async () => {
   const { result, staticData } = await poll({
-    params: { event: 'detectionUpdated', maxRecords: 1 },
+    params: { event: 'detectionUpdated', options: { maxRecords: 1 } },
     staticData: { since: '2026-09-01T00:00:00Z' },
     script: () => raw(200, detectionXml([[1, 90001]], NEXT_BATCH)),
   });
@@ -131,7 +131,7 @@ test('follows the next-batch URL until the window is covered', async () => {
 
 test('a manual poll reads the lookback and leaves the mark alone', async () => {
   const { result, calls, staticData } = await poll({
-    params: { event: 'detectionUpdated', lookbackMinutes: 5 },
+    params: { event: 'detectionUpdated', options: { lookbackMinutes: 5 } },
     mode: 'manual',
     staticData: { since: '2026-09-01T00:00:00Z' },
     script: () => raw(200, detectionXml([[1, 90001]])),
@@ -182,6 +182,23 @@ test('passes the watch filters and extra parameters through', async () => {
   assert.equal(calls[0].qs.show_qds, '1');
 });
 
+test('keeps its own polling options out of the Qualys query', async () => {
+  const { calls } = await poll({
+    params: {
+      event: 'detectionUpdated',
+      options: { lookbackMinutes: 5, maxRecords: 10, truncationLimit: 250, qids: '38170' },
+    },
+    script: () => raw(200, detectionXml([])),
+  });
+
+  const { qs } = calls[0];
+  assert.equal(qs.truncation_limit, 250);
+  assert.equal(qs.qids, '38170');
+  for (const name of ['lookbackMinutes', 'maxRecords', 'truncationLimit']) {
+    assert.ok(!(name in qs), `${name} was sent to Qualys`);
+  }
+});
+
 test('rejects an event it does not know', async () => {
   await assert.rejects(
     () => poll({ params: { event: 'somethingRetired' }, script: () => raw(200, '') }),
@@ -191,7 +208,7 @@ test('rejects an event it does not know', async () => {
 
 test('stops after the page backstop, leaving the backlog for the next poll', async () => {
   const { calls, staticData } = await poll({
-    params: { event: 'detectionUpdated', maxRecords: 0 },
+    params: { event: 'detectionUpdated', options: { maxRecords: 0 } },
     script: (_options, made) => raw(200, detectionXml([[made.length, 90000]], NEXT_BATCH)),
   });
 

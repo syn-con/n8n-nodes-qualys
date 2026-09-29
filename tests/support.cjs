@@ -143,10 +143,9 @@ const params = (operation, extra = {}) => ({
 const listParams = (operation, extra = {}) => ({
   operation,
   resource: OPERATIONS[operation]?.resource,
-  outputMode: 'items',
-  includeMetadata: false,
-  listAll: false,
-  count: 100,
+  options: { outputMode: 'items', includeMetadata: false },
+  returnAll: false,
+  limit: 100,
   truncationLimit: 100,
   ...extra,
 });

@@ -27,7 +27,7 @@ test('the node exposes a description and delegates execution', async () => {
   assert.equal(typeof node.execute, 'function');
 
   const { items } = await execute({
-    params: listParams('listHostAssets', { count: 1 }),
+    params: listParams('listHostAssets', { limit: 1 }),
     script: () => json({ assets: [{ assetId: 1 }] }, { count: '1' }),
   });
   assert.deepEqual(items.map((i) => i.json.assetId), [1]);
@@ -51,10 +51,10 @@ test('rejects an operation it does not know', async () => {
   );
 });
 
-test('rejects a zero Count unless List All is set', async () => {
+test('rejects a zero Limit unless Return All is set', async () => {
   await assert.rejects(
-    () => execute({ params: listParams('listHostAssets', { count: 0 }), script: () => json({}) }),
-    /Count must be greater than 0/,
+    () => execute({ params: listParams('listHostAssets', { limit: 0 }), script: () => json({}) }),
+    /Limit must be greater than 0/,
   );
 });
 
@@ -73,7 +73,7 @@ test('reports a failure per input item when continuing on fail', async () => {
 
 test('pages the OT plane by page number and stops on a short page', async () => {
   const { items, calls } = await execute({
-    params: listParams('listHostAssets', { listAll: true }),
+    params: listParams('listHostAssets', { returnAll: true }),
     script: (options) => {
       const page = options.qs.pageNumber;
       const assets = page === 0 ? Array.from({ length: 100 }, (_, i) => ({ assetId: i })) : [{ assetId: 100 }];
@@ -86,7 +86,7 @@ test('pages the OT plane by page number and stops on a short page', async () => 
 
 test('stops early when the OT count header is satisfied', async () => {
   const { calls } = await execute({
-    params: listParams('listHostAssets', { listAll: true }),
+    params: listParams('listHostAssets', { returnAll: true }),
     script: () => json(
       { assets: Array.from({ length: 100 }, (_, i) => ({ assetId: i })) },
       { count: '100' },
@@ -99,7 +99,7 @@ test('stops early when the OT count header is satisfied', async () => {
 test('sends the OT filter and sort when configured', async () => {
   const { calls } = await execute({
     params: listParams('listHostAssets', {
-      count: 1,
+      limit: 1,
       filterGroups: {
         filterGroups: [
           { filters: { filters: [{ identifier: 'hardware.class', operator: ':', value: 'IT' }] } },
@@ -125,7 +125,7 @@ test('treats a 404 as an empty OT project file list', async () => {
 
 test('follows the Asset Management cursor until it is exhausted', async () => {
   const { items, calls } = await execute({
-    params: listParams('listAssets', { listAll: true, csamOptions: { pageSize: 2 } }),
+    params: listParams('listAssets', { returnAll: true, csamOptions: { pageSize: 2 } }),
     script: (options) => {
       const cursor = options.qs.lastSeenAssetId;
       if (!cursor) {
@@ -141,7 +141,7 @@ test('follows the Asset Management cursor until it is exhausted', async () => {
 test('passes the Asset Management options through to the query', async () => {
   const { calls } = await execute({
     params: listParams('listAssets', {
-      count: 1,
+      limit: 1,
       csamOptions: {
         pageSize: 7,
         includeFields: 'hardware',
@@ -205,7 +205,7 @@ test('returns the raw body when a get finds no record array', async () => {
 test('sends the software component filter as two blocks', async () => {
   const { calls } = await execute({
     params: listParams('listComponents', {
-      count: 1,
+      limit: 1,
       csamMatch: 'AND',
       csamOptions: {},
       csamFilters: {
@@ -259,7 +259,7 @@ test('treats an empty component response as no records', async () => {
 
 test('pages the gateway plane while it reports another page', async () => {
   const { items, calls } = await execute({
-    params: listParams('listProfiles', { listAll: true }),
+    params: listParams('listProfiles', { returnAll: true }),
     script: (options) => {
       const page = options.qs.pageNumber;
       if (page >= 2) return raw(404, JSON.stringify({ message: 'Profile does not exists.' }));
@@ -275,7 +275,7 @@ test('pages the gateway plane while it reports another page', async () => {
 test('follows the platform next-batch URL until it stops', async () => {
   const next = 'https://qualysapi.qg2.apps.qualys.eu/api/5.0/fo/asset/host/?action=list&id_min=2';
   const { items, calls } = await execute({
-    params: listParams('listHosts', { listAll: true, hostOptions: {} }),
+    params: listParams('listHosts', { returnAll: true, hostOptions: {} }),
     script: (options) =>
       raw(200, options.url.includes('id_min=2') ? hostXml(2) : hostXml(1, next)),
   });
@@ -287,7 +287,7 @@ test('follows the platform next-batch URL until it stops', async () => {
 test('stops when the next-batch URL repeats', async () => {
   const stuck = 'https://qualysapi.qg2.apps.qualys.eu/api/5.0/fo/asset/host/?action=list&stuck=1';
   const { calls } = await execute({
-    params: listParams('listHosts', { listAll: true, hostOptions: {} }),
+    params: listParams('listHosts', { returnAll: true, hostOptions: {} }),
     script: () => raw(200, hostXml(1, stuck)),
   });
   // First request, the stuck URL once, then the repeat is refused.
@@ -297,7 +297,7 @@ test('stops when the next-batch URL repeats', async () => {
 test('builds the platform query from options, booleans and extras', async () => {
   const { calls } = await execute({
     params: listParams('listDetections', {
-      count: 1,
+      limit: 1,
       truncationLimit: 5,
       itemGranularity: 'detection',
       detectionOptions: {
@@ -325,7 +325,7 @@ test('builds the platform query from options, booleans and extras', async () => 
 
 test('falls back to the default batch size when it is not a number', async () => {
   const { calls } = await execute({
-    params: listParams('listHosts', { count: 1, truncationLimit: 'abc', hostOptions: {} }),
+    params: listParams('listHosts', { limit: 1, truncationLimit: 'abc', hostOptions: {} }),
     script: () => raw(200, hostXml(1)),
   });
   assert.equal(calls[0].qs.truncation_limit, 1000);
@@ -391,7 +391,7 @@ test('emits one item per detection, or one per host', async () => {
 
 test('returns every page verbatim in raw mode', async () => {
   const { items } = await execute({
-    params: listParams('listHostAssets', { listAll: true, outputMode: 'raw' }),
+    params: listParams('listHostAssets', { returnAll: true, options: { outputMode: 'raw' } }),
     script: (options) =>
       json({ assets: options.qs.pageNumber === 0 ? Array.from({ length: 100 }, (_, i) => ({ assetId: i })) : [] }),
   });
@@ -404,7 +404,7 @@ test('returns every page verbatim in raw mode', async () => {
 
 test('attaches response metadata when asked', async () => {
   const { items } = await execute({
-    params: listParams('listHostAssets', { count: 1, includeMetadata: true }),
+    params: listParams('listHostAssets', { limit: 1, options: { includeMetadata: true } }),
     script: () =>
       json({ assets: [{ assetId: 1 }] }, {
         count: '319',
@@ -434,7 +434,7 @@ test('attaches response metadata when asked', async () => {
 
 test('leaves metadata fields undefined when the headers are absent', async () => {
   const { items } = await execute({
-    params: listParams('listHostAssets', { count: 1, includeMetadata: true }),
+    params: listParams('listHostAssets', { limit: 1, options: { includeMetadata: true } }),
     script: () => json({ assets: [{ assetId: 1 }] }, { count: '' }),
   });
   const meta = items[0].json._qualys;
@@ -444,7 +444,7 @@ test('leaves metadata fields undefined when the headers are absent', async () =>
 
 test('wraps a scalar record so it still has a JSON shape', async () => {
   const { items } = await execute({
-    params: listParams('listProjectFiles', { count: 2 }),
+    params: listParams('listProjectFiles', { limit: 2 }),
     script: () => json(['first', 'second']),
   });
   assert.deepEqual(items.map((i) => i.json.value), ['first', 'second']);
@@ -452,7 +452,7 @@ test('wraps a scalar record so it still has a JSON shape', async () => {
 
 test('stops at Count part-way through a page', async () => {
   const { items } = await execute({
-    params: listParams('listHostAssets', { count: 3 }),
+    params: listParams('listHostAssets', { limit: 3 }),
     script: (options) =>
       json({
         assets: Array.from({ length: 100 }, (_, i) => ({ assetId: options.qs.pageNumber * 100 + i })),
@@ -473,19 +473,11 @@ test('runs a get for every input item, pairing each result', async () => {
   assert.deepEqual(items.map((i) => i.pairedItem.item), [0, 1]);
 });
 
-test('runs a list once for many items, or once per item on request', async () => {
-  const once = await execute({
-    inputItems: [{ json: {} }, { json: {} }, { json: {} }],
-    params: listParams('listHostAssets', { count: 1 }),
-    script: () => json({ assets: [{ assetId: 1 }] }, { count: '1' }),
-  });
-  assert.equal(once.calls.length, 1);
-
+test('runs a list once per input item, so filters can reference each one', async () => {
   const each = await execute({
     inputItems: [{ json: { n: 1 } }, { json: { n: 2 } }],
     params: listParams('listHostAssets', {
-      count: 1,
-      runOnce: false,
+      limit: 1,
       filterGroups: (item) => ({
         filterGroups: [{ filters: { filters: [{ identifier: 'asset.name', operator: ':', value: `host${item.n}` }] } }],
       }),
@@ -514,7 +506,7 @@ test('keeps going through later items when one fails', async () => {
 test('runs once when there is no input at all', async () => {
   const { calls } = await execute({
     inputItems: [],
-    params: listParams('listHostAssets', { count: 1 }),
+    params: listParams('listHostAssets', { limit: 1 }),
     script: () => json({ assets: [{ assetId: 1 }] }, { count: '1' }),
   });
   assert.equal(calls.length, 1);
@@ -527,7 +519,7 @@ test('fails loudly rather than paging forever', async () => {
   await assert.rejects(
     () =>
       execute({
-        params: listParams('listProfiles', { listAll: true }),
+        params: listParams('listProfiles', { returnAll: true }),
         script: () => {
           page += 1;
           return json({ hasNextPage: true, profile: [{ name: `p${page}` }] });
@@ -549,7 +541,7 @@ test('walks the KnowledgeBase in QID windows, since the API has no paging', asyn
   // larger than a JS string can hold - so a full pull is chunked by QID.
   const { items, calls } = await execute({
     params: listParams('listKnowledgeBase', {
-      listAll: true,
+      returnAll: true,
       idWindowSize: 1000,
       knowledgeBaseOptions: {},
     }),
@@ -569,7 +561,7 @@ test('walks the KnowledgeBase in QID windows, since the API has no paging', asyn
 test('treats an explicit QID range as the bounds of the walk', async () => {
   const { calls } = await execute({
     params: listParams('listKnowledgeBase', {
-      listAll: true,
+      returnAll: true,
       idWindowSize: 10,
       knowledgeBaseOptions: { id_min: '5', id_max: '25' },
     }),
@@ -586,7 +578,7 @@ test('treats an explicit QID range as the bounds of the walk', async () => {
 test('asks once when the KnowledgeBase request already names its QIDs', async () => {
   const { items, calls } = await execute({
     params: listParams('listKnowledgeBase', {
-      listAll: true,
+      returnAll: true,
       knowledgeBaseOptions: { ids: '90001,90002' },
     }),
     script: () => raw(200, vulnXml([90001, 90002])),

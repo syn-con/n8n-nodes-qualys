@@ -126,10 +126,11 @@ events under **Triggers** and the read operations under **Actions**.
 
 Each poll reads one window of time: from where the last poll stopped to the moment this one
 started. The mark lives in the node's static data, so restarting n8n resumes rather than
-replaying or skipping. **First Poll Covers (Minutes)** sets how far the very first poll
-reaches back — 0 emits only what happens after activation.
+replaying or skipping. The polling settings sit under **Options**, beside the watch filters.
+**First Poll Covers (Minutes)** sets how far the very first poll reaches back (default 60) — 0
+emits only what happens after activation.
 
-**Max Records Per Poll** caps a single run so a backlog cannot flood the workflow. Nothing is
+**Max Records Per Poll** (default 1000) caps a single run so a backlog cannot flood the workflow. Nothing is
 dropped: the poll remembers Qualys' next-batch URL, the high-water mark stays put, and the
 following poll finishes that window before opening a new one. Batches are taken whole, so a
 poll can overshoot the cap by up to one **Batch Size**.
@@ -218,7 +219,8 @@ of field/operator/value rows plus one **Match** setting for the whole list. Ther
 nesting, and the operator must suit the field's type or the API answers 400. Use the `IN`
 operator with a comma-separated value for OR within a single field.
 
-**Platform operations** take Qualys' documented named parameters directly, under **Options**.
+**Platform operations** take Qualys' documented named parameters directly, under **Additional
+Fields**.
 Combinations the API rejects with an opaque 400 — `ag_ids` with `ag_titles`, a search list with
 `qids`, `qds_min` without `show_qds` — are caught before the request goes out. Anything not
 surfaced as a field can be passed through **Extra Parameters**.
@@ -230,7 +232,8 @@ filter, and the two are ANDed. It also pages on its own parameter and allows a p
 
 ### Paging
 
-**List All** pages until the API is exhausted; otherwise **Count** caps the result.
+**Return All** pages until the API is exhausted; otherwise **Limit** caps the result
+(default 50).
 
 Each plane pages differently and the node handles all three: page numbers for OT, a
 `lastSeenAssetId` cursor for IT Asset, and the next-batch URL Qualys returns for VMDR. **Batch
@@ -249,14 +252,14 @@ subscriptions we measured — so parallel fetching would simply fail.
 
 ### Output
 
-**Output Mode** is either one item per record or the raw response, page by page.
+**Options > Output Mode** is either one item per record or the raw response, page by page.
 
 **VMDR > List Detections** additionally offers **Item Granularity**: one item per detection
 with its host context flattened in (the default, and what joins cleanly against the other
 operations), or one item per host with detections nested.
 
-**Add Response Metadata** attaches `_qualys` to each item with the endpoint, plane, batch count
-and the rate-limit headers.
+**Options > Add Response Metadata** attaches `_qualys` to each item with the endpoint, plane,
+batch count and the rate-limit headers. It has no effect on a raw response.
 
 VMDR responses are XML and are converted to JSON with Qualys' quirks handled: CDATA is
 unwrapped, `<QDS severity="LOW">25</QDS>` keeps both parts, attribute-keyed lists such as
@@ -267,21 +270,14 @@ Field names are left exactly as Qualys documents them.
 ### Using upstream data
 
 Every field that carries a value is expression-enabled, so it can be driven from an upstream
-node: `Asset ID`, `CVE IDs`, filter fields and values, everything under **Options**, and
-`Count` and `Batch Size`. Only `Resource`, `Operation` and the QQL operator/join dropdowns are
+node: `Asset ID`, `CVE IDs`, filter fields and values, everything under **Additional Fields**,
+and `Limit` and `Batch Size`. Only `Resource`, `Operation` and the QQL operator/join dropdowns are
 fixed, since those drive which fields the panel shows.
 
-How input items map to requests depends on the operation:
-
-| Operation | Behaviour |
-|---|---|
-| **Get** | One request per input item, always. Parameters resolve against that item. |
-| **List**, **Count** | One request in total by default, however many items arrive. |
-
-`List` defaults to a single run because the query is described by the node's own parameters —
-running it per item would emit the whole result set once per input item. Turn off **Run Once
-For All Items** to get one query per input item instead, with parameters resolving against each
-one.
+Every operation runs once per input item, with parameters resolving against that item. A
+**List** or **Count** whose query does not depend on its input would then emit the whole result
+set once per item; to run it a single time however many items arrive, turn on n8n's own
+**Execute Once** in the node's settings.
 
 Output items carry `pairedItem`, so n8n can trace each record back to the input that produced
 it.
@@ -295,9 +291,9 @@ it.
 
 Two ways to do the detection → KnowledgeBase join, both valid:
 
-- **One call.** Leave *Run Once* on and aggregate the QIDs into the `QIDs` field:
+- **One call.** Turn on *Execute Once* and aggregate the QIDs into the `QIDs` field:
   `{{ $input.all().map(i => i.json.QID).join(',') }}`. Cheapest, and the API accepts a list.
-- **One call per detection.** Turn *Run Once* off and set `QIDs` to `{{ $json.QID }}`. Slower,
+- **One call per detection.** Leave *Execute Once* off and set `QIDs` to `{{ $json.QID }}`. Slower,
   but each output row pairs with its detection.
 
 ### Errors
@@ -342,6 +338,20 @@ raw-header and socket internals dropped, reference cycles broken, and size bound
 * [Qualys API authentication](https://docs.qualys.com/en/csam/api/get_started/API_Authentication.htm)
 
 ## Version history
+
+### Unreleased
+
+The parameters now follow n8n's own conventions. **Saved workflows lose these settings and fall
+back to the defaults**, so check each Qualys node after upgrading:
+
+- **List All** and **Count** are now **Return All** and **Limit**. Limit defaults to 50, not 100.
+- **Run Once For All Items** is gone. List and Count operations now run once per input item,
+  as Get always did. Turn on n8n's **Execute Once** node setting for a single run.
+- **Output Mode** and **Add Response Metadata** are now under **Options**.
+- The Qualys parameters that were under **Options** are now labelled **Additional Fields**, on
+  VMDR, IT Asset and EASM alike. Only the label changed; their values are kept.
+- On **Qualys Trigger**, **First Poll Covers (Minutes)**, **Max Records Per Poll** and **Batch
+  Size** are now under **Options**.
 
 ### 2.2
 
