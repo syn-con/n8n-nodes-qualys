@@ -339,7 +339,7 @@ raw-header and socket internals dropped, reference cycles broken, and size bound
 
 ## Version history
 
-### Unreleased
+### 3.0
 
 The parameters now follow n8n's own conventions. **Saved workflows lose these settings and fall
 back to the defaults**, so check each Qualys node after upgrading:
