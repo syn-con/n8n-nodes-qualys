@@ -6,7 +6,7 @@ const originalLoad = Module._load;
 Module._load = function patchedLoad(request, parent, isMain) {
   if (request === 'n8n-workflow') {
     return {
-      NodeConnectionType: { Main: 'main' },
+      NodeConnectionTypes: { Main: 'main' },
       NodeApiError: class NodeApiError extends Error {},
       NodeOperationError: class NodeOperationError extends Error {},
     };

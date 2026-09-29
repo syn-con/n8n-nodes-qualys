@@ -3,14 +3,11 @@ import type {
   INodeType,
   INodeTypeDescription,
   IPollFunctions,
-  NodeConnectionType,
 } from 'n8n-workflow';
+import { NodeConnectionTypes } from 'n8n-workflow';
 
 import { triggerProperties } from './trigger/events';
 import { poll } from './trigger/poll';
-
-/** See the note on the same constant in QualysVmdrOt.node.ts. */
-const MAIN: NodeConnectionType = 'main';
 
 /**
  * Polling trigger for the VMDR platform API.
@@ -34,7 +31,7 @@ export class QualysVmdrOtTrigger implements INodeType {
     },
     polling: true,
     inputs: [],
-    outputs: [MAIN],
+    outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
         name: 'qualysVmdrOtApi',

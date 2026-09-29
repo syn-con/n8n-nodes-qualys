@@ -3,19 +3,11 @@ import type {
   INodeExecutionData,
   INodeType,
   INodeTypeDescription,
-  NodeConnectionType,
 } from 'n8n-workflow';
+import { NodeConnectionTypes } from 'n8n-workflow';
 
 import { properties } from './actions/description';
 import { router } from './actions/router';
-
-/**
- * n8n-workflow 2.x turned `NodeConnectionType` into a type and moved the runtime
- * value to `NodeConnectionTypes`, so the old `NodeConnectionType.Main` is
- * `undefined` there. The wire value is 'main' in both generations, so using the
- * literal keeps this correct whichever version the host resolves.
- */
-const MAIN: NodeConnectionType = 'main';
 
 export class QualysVmdrOt implements INodeType {
   description: INodeTypeDescription = {
@@ -30,8 +22,8 @@ export class QualysVmdrOt implements INodeType {
     defaults: {
       name: 'Qualys',
     },
-    inputs: [MAIN],
-    outputs: [MAIN],
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
     usableAsTool: true,
     credentials: [
       {
