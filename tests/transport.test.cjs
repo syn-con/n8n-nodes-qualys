@@ -564,6 +564,40 @@ test('handles XML shapes the node meets only rarely', () => {
   assert.doesNotThrow(() => parseQualysXml('not xml at all'));
 });
 
+test('reads the markup Qualys wraps around its data', () => {
+  const parsed = parseQualysXml(
+    '<?xml version="1.0" encoding="UTF-8" ?>\n' +
+      '<!DOCTYPE R SYSTEM "https://qualysapi.example/r.dtd" [ <!ELEMENT R ANY> ]>\n' +
+      '<!-- generated --><?pi ignored?>' +
+      '<R><N a="x &amp; y" b=\'q>r\'>1 &lt; 2 &#65;&#x42; &bogus;</N>' +
+      '<C><![CDATA[<b>raw & kept</b>]]></C><E/><E></E></R>',
+  );
+
+  // The declaration keeps the shape it has always had; the rest is dropped.
+  assert.deepEqual(parsed['?xml'], { version: '1.0', encoding: 'UTF-8' });
+  assert.deepEqual(Object.keys(parsed), ['?xml', 'R']);
+
+  // Entities are decoded in text and attributes, a `>` inside a quoted
+  // attribute does not end the tag, and unknown entities are left alone.
+  assert.deepEqual(parsed.R.N, { value: '1 < 2 AB &bogus;', a: 'x & y', b: 'q>r' });
+
+  // CDATA is taken verbatim.
+  assert.equal(parsed.R.C, '<b>raw & kept</b>');
+
+  // Empty elements, self-closed or not, mean "no value".
+  assert.deepEqual(parsed.R.E, [null, null]);
+});
+
+test('keeps what it could read from a truncated or malformed document', () => {
+  // A response cut off mid-stream still yields the records before the cut.
+  const truncated = parseQualysXml('<R><HOST_LIST><HOST><ID>1</ID></HOST><HOST><ID>2</I');
+  assert.deepEqual(truncated.R.HOST_LIST.HOST, [{ ID: 1 }, { ID: 2 }]);
+
+  // A stray closing tag is ignored; one that skips an open element closes it.
+  const stray = parseQualysXml('<R><A>1</B></A><C><D>2</C></R>');
+  assert.deepEqual(stray.R, { A: 1, C: { D: 2 } });
+});
+
 test('ignores attribute-keyed entries that carry no key', () => {
   const factors = parseQualysXml(
     '<R><QDS_FACTORS><QDS_FACTOR name="CVSS">4.7</QDS_FACTOR>' +

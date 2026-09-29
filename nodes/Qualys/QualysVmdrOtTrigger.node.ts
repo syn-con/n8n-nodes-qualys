@@ -1,10 +1,10 @@
-import type {
-  INodeExecutionData,
-  INodeType,
-  INodeTypeDescription,
-  IPollFunctions,
+import {
+  NodeConnectionTypes,
+  type INodeExecutionData,
+  type INodeType,
+  type INodeTypeDescription,
+  type IPollFunctions,
 } from 'n8n-workflow';
-import { NodeConnectionTypes } from 'n8n-workflow';
 
 import { triggerProperties } from './trigger/events';
 import { poll } from './trigger/poll';

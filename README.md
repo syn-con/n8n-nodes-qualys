@@ -200,8 +200,9 @@ explains why rather than sending you to check your entitlements.
 Built against `n8nNodesApiVersion` 1 and requires Node.js 20.15 or later, matching n8n's own
 floor. Developed and tested against n8n 1.x.
 
-The package declares no runtime dependencies. The XML parser the Qualys platform API requires
-is bundled into the published build, so installing this node adds nothing to the n8n instance.
+The package declares no runtime dependencies and ships no third-party code. The Qualys platform
+API answers only in XML, so the node reads it with a small parser of its own
+(`nodes/Qualys/transport/xmlReader.ts`); installing the node adds nothing to the n8n instance.
 
 ## Usage
 
@@ -421,11 +422,11 @@ inside a resource folder.
 
 ### The build
 
-`n8n-node build` is `tsc` plus an icon copy, which is not enough here. Community nodes may not
-declare runtime dependencies, so `scripts/build.mjs` bundles the XML parser into the emitted
-JavaScript with esbuild, emits declarations, and copies the icons and the `.node.json` codex
-that `tsc` leaves behind. `tests/bundle.test.cjs` asserts the published artifact is
-self-contained, since a stray `require` would only fail on an n8n host.
+`n8n-node build` is `tsc` plus an icon copy, which is not enough here. `scripts/build.mjs`
+bundles each entry point with esbuild, emits declarations, and copies the icons and the
+`.node.json` codex that `tsc` leaves behind. Community nodes may not ship third-party code, so
+`tests/bundle.test.cjs` asserts the published artifact requires nothing but `n8n-workflow` and
+Node built-ins, and inlines nothing from `node_modules`.
 
 ### Requirements
 
@@ -477,7 +478,3 @@ it. Authentication is either npm Trusted Publishing via OIDC (no stored secret) 
 ## License
 
 [MIT](LICENSE) — Copyright (c) 2026 UAB Synergy.
-
-The published build bundles
-[fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser), also MIT licensed;
-see [NOTICE](NOTICE).

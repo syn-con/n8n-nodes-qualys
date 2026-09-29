@@ -3,10 +3,10 @@
 /**
  * Guards the published artifact rather than the source.
  *
- * Community nodes may not declare runtime dependencies, so `fast-xml-parser` is
- * bundled into `dist` at build time. Nothing in the source tree can catch a
- * regression there - a stray `require` only fails on an n8n host, where the
- * package is not installed. These tests read `dist` directly.
+ * Community nodes may not ship third-party code, whether declared as a
+ * dependency or inlined by the bundler. Nothing in the source tree can catch a
+ * regression there - a stray `require` only fails on an n8n host, and inlined
+ * code only shows up in the output. These tests read `dist` directly.
  */
 
 const assert = require('node:assert/strict');
@@ -58,14 +58,13 @@ test('bundled entry points require nothing the n8n host does not provide', () =>
   }
 });
 
-test('the XML parser is inlined rather than required', () => {
-  const node = readFileSync(path.join(root, pkg.n8n.nodes[0]), 'utf8');
-  assert.ok(
-    !/require\(["']fast-xml-parser["']\)/.test(node),
-    'fast-xml-parser must be bundled, not required',
-  );
-  // The bundled parser has to actually be in there, or XML responses break.
-  assert.ok(node.includes('XMLParser'), 'the bundled parser is missing from the node');
+test('no third-party code is inlined into the bundle', () => {
+  // esbuild marks each inlined module with a `// node_modules/<package>/...` comment.
+  for (const entry of BUNDLED_ENTRIES) {
+    const source = readFileSync(path.join(root, entry), 'utf8');
+    const inlined = [...source.matchAll(/^\s*\/\/ node_modules\/(\S+)/gm)].map((m) => m[1]);
+    assert.deepEqual(inlined, [], `${entry} inlines third-party code`);
+  }
 });
 
 test('the bundled node loads and describes itself', () => {

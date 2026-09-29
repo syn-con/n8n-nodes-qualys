@@ -2,15 +2,12 @@
  * Build the publishable artifact.
  *
  * `n8n-node build` is `tsc` plus a copy of `**\/*.{png,svg}`. That is not enough
- * here for two reasons:
+ * here: n8n reads a node's codex from `<node>.node.json` sitting beside the
+ * compiled node. `tsc` does not copy it, so the categories and the
+ * documentation links were silently absent from every published version.
  *
- *   - Community nodes may not declare runtime dependencies, so `fast-xml-parser`
- *     has to be bundled into the emitted JavaScript rather than resolved from
- *     `node_modules` on the n8n host. Qualys' platform API answers only in XML,
- *     so the parser is not optional.
- *   - n8n reads a node's codex from `<node>.node.json` sitting beside the
- *     compiled node. `tsc` does not copy it, so the categories and the
- *     documentation links were silently absent from every published version.
+ * Community nodes may not ship third-party code, bundled or not, so the only
+ * modules inlined here are this package's own; `n8n-workflow` stays external.
  *
  * Entry points stay separate, and `outbase` keeps the source tree's shape,
  * because n8n loads the paths named in package.json's `n8n` field.

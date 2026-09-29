@@ -1,5 +1,6 @@
-import { XMLParser } from 'fast-xml-parser';
 import type { IDataObject } from 'n8n-workflow';
+
+import { ATTR_PREFIX, CDATA_KEY, TEXT_KEY, readXml } from './xmlReader';
 
 /** Elements that repeat and must stay arrays even when a single one is present. */
 const ALWAYS_ARRAY = new Set([
@@ -67,28 +68,14 @@ const HOISTABLE_CONTAINERS: Record<string, string> = {
   QDS_FACTORS: 'QDS_FACTOR',
 };
 
-const ATTR_PREFIX = '@_';
-const TEXT_KEY = '#text';
-
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: ATTR_PREFIX,
-  textNodeName: TEXT_KEY,
-  cdataPropName: '__cdata',
-  trimValues: true,
-  // Coerce deliberately in normalise() instead: automatic coercion mangles IP
-  // addresses, leading-zero identifiers and version strings.
-  parseTagValue: false,
-  parseAttributeValue: false,
-  isArray: (name, jpath) => {
-    if (ALWAYS_ARRAY.has(name)) {
-      return true;
-    }
-    // jpath is a string unless the parser is configured with `jPath: false`.
-    const path = typeof jpath === 'string' ? jpath : '';
-    return ARRAY_BY_PATH.some((suffix) => path.endsWith(suffix));
-  },
-});
+/**
+ * Values stay strings out of the reader and are coerced deliberately in
+ * normalise(): automatic coercion mangles IP addresses, leading-zero
+ * identifiers and version strings.
+ */
+function isArray(name: string, path: string): boolean {
+  return ALWAYS_ARRAY.has(name) || ARRAY_BY_PATH.some((suffix) => path.endsWith(suffix));
+}
 
 function coerce(value: string): string | number | boolean | null {
   const trimmed = value.trim();
@@ -114,13 +101,13 @@ function isPlainObject(value: unknown): value is IDataObject {
 /** Collapse `{ '__cdata': 'x' }` and `{ '#text': 'x' }` wrappers to their value. */
 function unwrapText(node: IDataObject): unknown | undefined {
   const keys = Object.keys(node);
-  const contentKeys = keys.filter((k) => k === '__cdata' || k === TEXT_KEY);
+  const contentKeys = keys.filter((k) => k === CDATA_KEY || k === TEXT_KEY);
 
-  if (contentKeys.length === 0 || keys.some((k) => !k.startsWith(ATTR_PREFIX) && k !== '__cdata' && k !== TEXT_KEY)) {
+  if (contentKeys.length === 0 || keys.some((k) => !k.startsWith(ATTR_PREFIX) && k !== CDATA_KEY && k !== TEXT_KEY)) {
     return undefined;
   }
 
-  const raw = node.__cdata ?? node[TEXT_KEY];
+  const raw = node[CDATA_KEY] ?? node[TEXT_KEY];
   return typeof raw === 'string' ? coerce(raw) : (raw ?? null);
 }
 
@@ -147,7 +134,7 @@ function normaliseChild(key: string, value: unknown, out: IDataObject): void {
     return;
   }
 
-  if (key === '__cdata' || key === TEXT_KEY) {
+  if (key === CDATA_KEY || key === TEXT_KEY) {
     out.value = (typeof value === 'string' ? coerce(value) : value) as IDataObject['value'];
     return;
   }
@@ -214,7 +201,7 @@ function flattenAttributeKeyed(entries: unknown[], attributeKey: string): IDataO
       continue;
     }
 
-    const raw = entry.__cdata ?? entry[TEXT_KEY];
+    const raw = entry[CDATA_KEY] ?? entry[TEXT_KEY];
     flat[String(name)] = (typeof raw === 'string' ? coerce(raw) : (raw ?? null)) as IDataObject['value'];
   }
 
@@ -222,7 +209,7 @@ function flattenAttributeKeyed(entries: unknown[], attributeKey: string): IDataO
 }
 
 export function parseQualysXml(xml: string): IDataObject {
-  const parsed = parser.parse(xml) as IDataObject;
+  const parsed = readXml(xml, isArray);
   const normalised = normalise(parsed);
   return isPlainObject(normalised) ? normalised : ({ value: normalised } as IDataObject);
 }
