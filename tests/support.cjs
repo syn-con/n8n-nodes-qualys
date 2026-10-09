@@ -32,6 +32,7 @@ const originalLoad = Module._load;
 Module._load = function patchedLoad(request, parent, isMain) {
   if (request === 'n8n-workflow') {
     return {
+      NodeConnectionTypes: { Main: 'main' },
       NodeApiError,
       NodeOperationError,
       // Real waits would make the rate-limit tests take a minute and a half.

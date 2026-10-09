@@ -1,8 +1,9 @@
-import type {
-  IExecuteFunctions,
-  INodeExecutionData,
-  INodeType,
-  INodeTypeDescription,
+import {
+  NodeConnectionTypes,
+  type IExecuteFunctions,
+  type INodeExecutionData,
+  type INodeType,
+  type INodeTypeDescription,
 } from 'n8n-workflow';
 
 import { properties } from './actions/description';
@@ -21,10 +22,8 @@ export class QualysVmdrOt implements INodeType {
     defaults: {
       name: 'Qualys',
     },
-    // eslint-disable-next-line @n8n/community-nodes/node-connection-type-literal -- the n8n verification review asked for the literal
-    inputs: ['main'],
-    // eslint-disable-next-line @n8n/community-nodes/node-connection-type-literal -- the n8n verification review asked for the literal
-    outputs: ['main'],
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
     usableAsTool: true,
     credentials: [
       {

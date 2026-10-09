@@ -1,8 +1,9 @@
-import type {
-  INodeExecutionData,
-  INodeType,
-  INodeTypeDescription,
-  IPollFunctions,
+import {
+  NodeConnectionTypes,
+  type INodeExecutionData,
+  type INodeType,
+  type INodeTypeDescription,
+  type IPollFunctions,
 } from 'n8n-workflow';
 
 import { triggerProperties } from './trigger/events';
@@ -30,8 +31,7 @@ export class QualysVmdrOtTrigger implements INodeType {
     },
     polling: true,
     inputs: [],
-    // eslint-disable-next-line @n8n/community-nodes/node-connection-type-literal -- the n8n verification review asked for the literal
-    outputs: ['main'],
+    outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
         name: 'qualysVmdrOtApi',
