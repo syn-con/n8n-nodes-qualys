@@ -1,0 +1,95 @@
+# Creates a GitHub Release for each version, with the npm tarball attached.
+#
+# Runs after the Publish workflow succeeds for a tag, then downloads the tarball
+# npm actually serves (`npm pack <name>@<version>`) rather than packing again.
+# The .tgz on the release is therefore byte-identical to the one on npm, which is
+# the one carrying the provenance attestation. A .sha256 file sits beside it.
+#
+# To create a release for a version that was published before this workflow
+# existed, run it by hand (Actions → Release → Run workflow) with that tag.
+
+name: Release
+
+on:
+  workflow_run:
+    workflows: [Publish]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag to release, e.g. 3.0.2'
+        required: true
+
+jobs:
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    # For a tag push, workflow_run's head_branch is the tag name.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+
+    permissions:
+      contents: write
+
+    env:
+      TAG: ${{ github.event.inputs.tag || github.event.workflow_run.head_branch }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check tag matches package.json
+        id: pkg
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if [ "$version" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match package.json version $version"
+            exit 1
+          fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Download the published tarball from npm
+        id: pack
+        run: |
+          mkdir -p release
+          # The registry can lag a few seconds behind a fresh publish.
+          for attempt in 1 2 3 4 5 6; do
+            if file=$(npm pack "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}" \
+                --pack-destination release --json \
+                | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].filename"); then
+              break
+            fi
+            [ "$attempt" = 6 ] && exit 1
+            sleep 10
+          done
+          cd release
+          sha256sum "$file" > "$file.sha256"
+          cat "$file.sha256"
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update the GitHub Release
+        run: |
+          file="release/${{ steps.pack.outputs.file }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$file" "$file.sha256" --clobber
+          else
+            prerelease=""
+            case "$TAG" in *-*) prerelease="--prerelease" ;; esac
+            gh release create "$TAG" "$file" "$file.sha256" \
+              --verify-tag \
+              --title "$TAG" \
+              --generate-notes \
+              $prerelease
+          fi
